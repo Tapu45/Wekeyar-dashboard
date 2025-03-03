@@ -1,0 +1,39 @@
+[
+    {
+      "store": {
+        "id": 1,
+        "name": "ABC Supermarket",
+        "address": "123 Main St, Cityville",
+        "phone": "123-456-7890",
+        "email": "abc@store.com",
+        "transactions": [
+          {
+            "id": 101,
+            "date": "2024-03-01T10:00:00Z",
+            "customer": {
+              "id": 1001,
+              "name": "John Doe",
+              "mobileNo": "9876543210",
+              "email": "john@example.com",
+              "address": "456 Elm St, Cityville"
+            },
+            "products": [
+              {
+                "id": 5001,
+                "name": "Rice",
+                "quantity": 2,
+                "amount": 20.5
+              },
+              {
+                "id": 5002,
+                "name": "Milk",
+                "quantity": 1,
+                "amount": 2.0
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+  

@@ -4,7 +4,10 @@ import { Request, Response } from "express";
 const prisma = new PrismaClient();
 
 // Get all stores with their data upload status
-export const getStoresUploadStatus = async (_req: Request, res: Response): Promise<void> => {
+export const getStoresUploadStatus = async (
+  _req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Normalize to start of the day
@@ -19,7 +22,7 @@ export const getStoresUploadStatus = async (_req: Request, res: Response): Promi
         },
       },
     });
-
+    console.log(stores);
     // Format response
     const storeData = stores.map((store) => {
       const latestSales = store.dailySales[0] || null;
@@ -29,10 +32,17 @@ export const getStoresUploadStatus = async (_req: Request, res: Response): Promi
         name: store.name,
         location: store.location || "N/A",
         currentDate: today.toISOString().split("T")[0], // Return YYYY-MM-DD format
-        dataUploaded: latestSales ? (latestSales.uploaded ? "Yes" : "No") : "No",
-        lastUpdated: latestSales ? latestSales.lastUpdated.toISOString() : "N/A",
+        dataUploaded: latestSales
+          ? latestSales.uploaded
+            ? "Yes"
+            : "No"
+          : "No",
+        lastUpdated: latestSales
+          ? latestSales.lastUpdated.toISOString()
+          : "N/A",
       };
     });
+    console.log("Store data:", storeData);
 
     res.status(200).json(storeData);
   } catch (error) {

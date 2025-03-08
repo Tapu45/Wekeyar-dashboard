@@ -1,11 +1,23 @@
-import express, { Request, Response } from "express";
+import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import routes from "./routes/routes";
 
 const app = express();
 
 // Enable CORS for all routes
-app.use(cors({ origin: "*" }));
+app.use(
+  cors({
+    origin: ["https://wekeyardashboard.vercel.app", "http://localhost:5173"],
+  })
+);
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use((_: Request, res: Response, next: NextFunction) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "*");
+  next();
+});
 
 app.use("/api", routes);
 

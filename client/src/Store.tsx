@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import StoreCard from './StoreCard';
-import './StoreDashboard.css';
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import StoreCard from "./StoreCard";
+import "./StoreDashboard.css";
 
 interface Store {
   id: string;
@@ -10,7 +10,7 @@ interface Store {
   dataUploaded: string;
   lastUpdated: string;
 }
-
+const API_URL = `${import.meta.env.VITE_API_URL}`;
 const StoreDashboard: React.FC = () => {
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -19,14 +19,14 @@ const StoreDashboard: React.FC = () => {
   useEffect(() => {
     const fetchStores = async () => {
       try {
-        const response = await axios.get('http://localhost:3000/api/stores/upload-status');
+        const response = await axios.get(`${API_URL}/api/stores/upload-status`);
         if (Array.isArray(response.data)) {
           setStores(response.data);
         } else {
-          setError('Unexpected response format');
+          setError("Unexpected response format");
         }
       } catch (err) {
-        setError('Error fetching store data');
+        setError("Error fetching store data");
       } finally {
         setLoading(false);
       }
@@ -57,7 +57,9 @@ const StoreDashboard: React.FC = () => {
     <div className="dashboard-container">
       <div className="dashboard-header">
         <h1 className="dashboard-title">Store Dashboard</h1>
-        <p className="dashboard-subtitle">Monitor your stores' data upload status</p>
+        <p className="dashboard-subtitle">
+          Monitor your stores' data upload status
+        </p>
       </div>
       <div className="cards-grid">
         {stores.map((store) => (

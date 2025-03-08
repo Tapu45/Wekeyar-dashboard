@@ -5,7 +5,7 @@ import routes from "./routes/routes";
 const app = express();
 
 // Enable CORS for all routes
-app.use(cors());
+app.use(cors({ origin: "*" }));
 
 app.use("/api", routes);
 

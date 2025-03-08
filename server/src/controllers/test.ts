@@ -16,7 +16,7 @@ export const getStoresUploadStatus = async (
     const stores = await prisma.store.findMany({
       include: {
         dailySales: {
-          where: { date: today }, // Fetch only today's data
+          where: { date: { lte: today } }, // Fetch only data up to today
           orderBy: { lastUpdated: "desc" }, // Get latest updated record
           take: 1, // Only the latest entry
         },

@@ -8,51 +8,51 @@ datasource db {
 }
 
 model Customer {
-  id           String   @id @default(uuid())
-  name         String
-  mobileNo     String   @unique
-  address      String?  
-  region       String?  // Added for region-based filtering
-  customerType String? // Regular, Occasional, etc. (for filtering)
-  transactions Transaction[]
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String   @unique
+  address   String? // Optional address
+  bills     Bill[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Store {
-  id           String   @id @default(uuid())
-  name         String
-  location     String?
-  transactions Transaction[]
-  dailySales   DailySales[] // Added relation field
+  id        Int      @id @default(autoincrement())
+  storeName String
+  address   String?
+  bills     Bill[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-model Transaction {
-  id          String   @id @default(uuid())
-  date        DateTime
-  customer    Customer @relation(fields: [customerId], references: [id])
-  customerId  String
-  store       Store    @relation(fields: [storeId], references: [id])
-  storeId     String
-  billNo      String?  @unique
-  totalAmount Decimal
-  products    Product[]
+model Bill {
+  id          Int           @id @default(autoincrement())
+  billNo      String        @unique
+  customerId  Int
+  storeId     Int
+  date        DateTime      @default(now())
+  netDiscount Float // Total discount on bill
+  netAmount   Float // Final bill amount after discount
+  isUploaded  Boolean       @default(false) // To track whether the bill is uploaded
+  billDetails BillDetails[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  store    Store    @relation(fields: [storeId], references: [id])
 }
 
-model Product {
-  id            String   @id @default(uuid())
-  transaction   Transaction @relation(fields: [transactionId], references: [id])
-  transactionId String
-  name          String
-  quantity      Int
-  amount        Decimal
-}
+model BillDetails {
+  id        Int      @id @default(autoincrement())
+  billId    Int
+  item      String
+  quantity  Int
+  batch     String
+  mrp       Float
+  discount  Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-model DailySales {
-  id           String   @id @default(uuid())
-  store        Store    @relation(fields: [storeId], references: [id])
-  storeId      String
-  date         DateTime
-  totalSales   Decimal
-  totalQuantity Int
-  uploaded     Boolean  @default(false) // New field to track data upload status
-  lastUpdated  DateTime @updatedAt 
+  bill Bill @relation(fields: [billId], references: [id])
 }

@@ -3,55 +3,70 @@ import { faker } from "@faker-js/faker";
 
 const prisma = new PrismaClient();
 
-const generateStores = async (count: number) => {
-  const stores = [];
-  for (let i = 0; i < count; i++) {
-    stores.push({
-      id: faker.string.uuid(),
-      name: faker.company.name(),
-      location: faker.location.city(),
+async function main() {
+  console.log("Seeding database...");
+
+  // Generate Stores
+  const stores = await prisma.store.createMany({
+    data: Array.from({ length: 5 }).map(() => ({
+      storeName: faker.company.name(),
+      address: faker.location.streetAddress(),
+    })),
+  });
+
+  // Fetch store IDs
+  const storeIds = await prisma.store.findMany({ select: { id: true } });
+
+  // Generate Customers
+  const customers = await prisma.customer.createMany({
+    data: Array.from({ length: 20 }).map(() => ({
+      name: faker.person.fullName(),
+      phone: faker.phone.number(),
+      address: faker.location.streetAddress(),
+    })),
+  });
+
+  // Fetch customer IDs
+  const customerIds = await prisma.customer.findMany({ select: { id: true } });
+
+  // Generate Bills
+  for (let i = 0; i < 50; i++) {
+    const customer = faker.helpers.arrayElement(customerIds);
+    const store = faker.helpers.arrayElement(storeIds);
+
+    const bill = await prisma.bill.create({
+      data: {
+        billNo: faker.string.uuid(),
+        customerId: customer.id,
+        storeId: store.id,
+        date: faker.date.past(),
+        netDiscount: faker.number.float({ min: 5, max: 50 }),
+        netAmount: faker.number.float({ min: 100, max: 5000 }),
+        isUploaded: faker.datatype.boolean(),
+      },
+    });
+
+    // Generate Bill Details
+    await prisma.billDetails.createMany({
+      data: Array.from({ length: faker.number.int({ min: 1, max: 5 }) }).map(() => ({
+        billId: bill.id,
+        item: faker.commerce.productName(),
+        quantity: faker.number.int({ min: 1, max: 10 }),
+        batch: faker.string.alphanumeric(8),
+        mrp: faker.number.float({ min: 10, max: 1000 }),
+        discount: faker.number.float({ min: 1, max: 20 }),
+      })),
     });
   }
-  return stores;
-};
 
-const generateDailySales = async (storeIds: string[]) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  console.log("Seeding completed.", { stores, customers });
+}
 
-  return storeIds.map((storeId) => ({
-    id: faker.string.uuid(),
-    storeId,
-    date: today,
-    uploaded: faker.datatype.boolean(), // Random Yes/No for uploaded
-    lastUpdated: faker.date.recent({ days: 3 }), // Random last update within last 3 days
-    totalSales: parseFloat(faker.finance.amount({ min: 100, max: 1000 })), // Random total sales between 100 and 1000
-    totalQuantity: faker.number.int({ min: 1, max: 100 }), // Random total quantity between 1 and 100
-  }));
-};
-
-const seedDatabase = async () => {
-  try {
-    console.log("Seeding database...");
-
-    // Create Fake Stores
-    const storeData = await generateStores(10);
-    await prisma.store.createMany({ data: storeData });
-
-    // Get store IDs
-    const stores = await prisma.store.findMany();
-    const storeIds = stores.map((store) => store.id);
-
-    // Create Fake Daily Sales Data
-    const salesData = await generateDailySales(storeIds);
-    await prisma.dailySales.createMany({ data: salesData });
-
-    console.log("Seeding complete!");
-  } catch (error) {
+main()
+  .catch((error) => {
     console.error("Error seeding database:", error);
-  } finally {
+    process.exit(1);
+  })
+  .finally(async () => {
     await prisma.$disconnect();
-  }
-};
-
-seedDatabase();
+  });

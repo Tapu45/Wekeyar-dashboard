@@ -10,7 +10,7 @@ app.use(cors({ origin: "*" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/api", routes);
+app.use("/reports", routes);
 
 app.get("/health-check", (_: Request, res: Response) => {
   res.status(200).json({ status: true, message: "Service is healthy" });

@@ -1,8 +1,14 @@
 import { Router } from "express";
-import { getStoresUploadStatus } from "../controllers/test";
 
 const router = Router();
+import {
+  getSummary,
+  getNonBuyingCustomers,
+  getNonBuyingMonthlyCustomers,
+} from "../controllers/reportController";
 
-router.get("/stores/upload-status", getStoresUploadStatus);
+router.get("/summary", getSummary);
+router.get("/non-buying-customers", getNonBuyingCustomers);
+router.get("/non-buying-monthly-customers", getNonBuyingMonthlyCustomers);
 
 export default router;

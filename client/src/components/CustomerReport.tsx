@@ -105,7 +105,7 @@ const CustomerReportPage: React.FC = () => {
             className="space-y-6"
           >
             <div className="flex justify-between items-center bg-blue-50 p-4 rounded-lg mb-6">
-              <p className="text-blue-800 font-medium">Showing  {data.length} customers</p>
+              <p className="text-blue-800 font-medium">Showing {visibleItems} of {data.length} customers</p>
               
               <div className="flex border border-blue-300 rounded-lg overflow-hidden">
                 <button
@@ -210,40 +210,34 @@ const CustomerReportPage: React.FC = () => {
                       <th className="text-left p-4">Mobile Number</th>
                       <th className="text-right p-4">Purchase Frequency</th>
                       <th className="text-right p-4">Total Sales</th>
-                      <th className="text-left p-4">Store Details</th>
+                      <th className="text-left p-4">Store Name</th>
+                      <th className="text-right p-4">Store Sales</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleData.map((customer, index) => (
-                      <motion.tr 
-                        key={index}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.3, delay: index * 0.05 }}
-                        className={index % 2 === 0 ? "bg-white" : "bg-blue-50"}
-                      >
-                        <td className="p-4 border-t border-gray-200 font-medium">{customer.customerName}</td>
-                        <td className="p-4 border-t border-gray-200">{customer.mobileNo}</td>
-                        <td className="p-4 border-t border-gray-200 text-right">{customer.purchaseFrequency}</td>
-                        <td className="p-4 border-t border-gray-200 text-right font-medium text-blue-600">
-                          ₹{customer.totalSales.toLocaleString(undefined, {maximumFractionDigits: 2})}
-                        </td>
-                        <td className="p-4 border-t border-gray-200">
-                        <div className="bg-white rounded-md shadow-sm border border-gray-100 p-2">
-                            {customer.stores.map((store, storeIndex) => (
-                              <div 
-                                key={storeIndex} 
-                                className={`flex justify-between items-center p-2 ${storeIndex !== customer.stores.length - 1 ? 'border-b border-gray-100' : ''}`}
-                              >
-                                <span className="text-sm">{store.storeName}</span>
-                                <span className="text-sm font-medium text-blue-600">₹{store.sales.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </tbody>
+        {visibleData.flatMap((customer, customerIndex) => 
+          customer.stores.map((store, storeIndex) => (
+            <motion.tr 
+              key={`${customerIndex}-${storeIndex}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, delay: (customerIndex * customer.stores.length + storeIndex) * 0.05 }}
+              className={(customerIndex % 2 === 0) ? "bg-white" : "bg-blue-50"}
+            >
+              <td className="p-4 border-t border-gray-200 font-medium">{customer.customerName}</td>
+              <td className="p-4 border-t border-gray-200">{customer.mobileNo}</td>
+              <td className="p-4 border-t border-gray-200 text-right">{customer.purchaseFrequency}</td>
+              <td className="p-4 border-t border-gray-200 text-right font-medium text-blue-600">
+                ₹{customer.totalSales.toLocaleString(undefined, {maximumFractionDigits: 2})}
+              </td>
+              <td className="p-4 border-t border-gray-200">{store.storeName}</td>
+              <td className="p-4 border-t border-gray-200 text-right font-medium text-blue-600">
+                ₹{store.sales.toLocaleString(undefined, {maximumFractionDigits: 2})}
+              </td>
+            </motion.tr>
+          ))
+        )}
+      </tbody>
                 </table>
               </div>
             )}

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getNonBuyingMonthlyCustomers = exports.getNonBuyingCustomers = exports.getSummary = void 0;
+exports.getCustomerReport = exports.getNonBuyingMonthlyCustomers = exports.getNonBuyingCustomers = exports.getSummary = void 0;
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
 const getSummary = async (_req, res) => {
@@ -113,4 +113,67 @@ const getNonBuyingMonthlyCustomers = async (_req, res) => {
     }
 };
 exports.getNonBuyingMonthlyCustomers = getNonBuyingMonthlyCustomers;
+const getCustomerReport = async (req, res) => {
+    try {
+        const { startDate, endDate, storeId } = req.query;
+        const start = startDate ? new Date(startDate) : undefined;
+        const end = endDate ? new Date(endDate) : undefined;
+        const whereCondition = {};
+        if (start && end) {
+            whereCondition.date = {
+                gte: start,
+                lte: end,
+            };
+        }
+        if (storeId) {
+            whereCondition.storeId = Number(storeId);
+        }
+        const bills = await prisma.bill.findMany({
+            where: whereCondition,
+            include: {
+                customer: true,
+                store: true,
+            },
+        });
+        const customerData = new Map();
+        bills.forEach((bill) => {
+            const { id, name, phone } = bill.customer;
+            const storeName = bill.store.storeName;
+            if (!customerData.has(id)) {
+                customerData.set(id, {
+                    customerName: name,
+                    mobileNo: phone,
+                    totalSales: 0,
+                    purchaseFrequency: 0,
+                    stores: new Map(),
+                });
+            }
+            const customerEntry = customerData.get(id);
+            customerEntry.totalSales += bill.netAmount;
+            customerEntry.purchaseFrequency += 1;
+            if (!customerEntry.stores.has(storeName)) {
+                customerEntry.stores.set(storeName, 0);
+            }
+            customerEntry.stores.set(storeName, customerEntry.stores.get(storeName) + bill.netAmount);
+        });
+        const result = Array.from(customerData.values()).map((entry) => ({
+            customerName: entry.customerName,
+            mobileNo: entry.mobileNo,
+            totalSales: entry.totalSales,
+            purchaseFrequency: entry.purchaseFrequency,
+            stores: Array.from(entry.stores.entries()).map(([storeName, sales]) => ({
+                storeName,
+                sales,
+            })),
+        }));
+        res.json(result);
+        return;
+    }
+    catch (error) {
+        console.error("Error fetching customer report:", error);
+        res.status(500).json({ error: "Internal server error" });
+        return;
+    }
+};
+exports.getCustomerReport = getCustomerReport;
 //# sourceMappingURL=reportController.js.map

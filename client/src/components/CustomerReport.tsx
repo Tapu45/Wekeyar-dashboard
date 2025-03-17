@@ -105,7 +105,7 @@ const CustomerReportPage: React.FC = () => {
             className="space-y-6"
           >
             <div className="flex justify-between items-center bg-blue-50 p-4 rounded-lg mb-6">
-              <p className="text-blue-800 font-medium">Showing {visibleItems} of {data.length} customers</p>
+              <p className="text-blue-800 font-medium">Showing  {data.length} customers</p>
               
               <div className="flex border border-blue-300 rounded-lg overflow-hidden">
                 <button

@@ -3,6 +3,7 @@ import SummaryReport from "./components/SummaryReport";
 import NonBuyingCustomerReport from "./components/NonBuyingCustomerReport";
 import NonBuyingMonthlyCustomer from "./components/NonBuyingMonthlyCustomer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import CustomerReportPage from "./components/CustomerReport";
 
 const queryClient = new QueryClient();
 
@@ -13,6 +14,7 @@ const App: React.FC = () => {
         <SummaryReport />
         <NonBuyingCustomerReport />
         <NonBuyingMonthlyCustomer />
+        <CustomerReportPage />
       </div>
     </QueryClientProvider>
   );

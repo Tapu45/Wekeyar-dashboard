@@ -133,3 +133,93 @@ export const getNonBuyingMonthlyCustomers = async (_req: Request, res: Response)
     res.status(500).json({ error: "Internal server error", details: error });
   }
 };
+
+/**
+ * 4. Customer Purchase History
+ */
+export const getCustomerReport = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { startDate, endDate, storeId } = req.query;
+
+    // Convert query params to proper types
+    const start = startDate ? new Date(startDate as string) : undefined;
+    const end = endDate ? new Date(endDate as string) : undefined;
+
+    const whereCondition: any = {};
+
+    if (start && end) {
+      whereCondition.date = {
+        gte: start,
+        lte: end, 
+      };
+    }
+
+    if (storeId) {
+      whereCondition.storeId = Number(storeId);
+    }
+
+    // Fetch all relevant bills
+    const bills = await prisma.bill.findMany({
+      where: whereCondition,
+      include: {
+        customer: true,
+        store: true,
+      },
+    });
+
+    // Group by customer
+    const customerData = new Map();
+
+    bills.forEach((bill) => {
+      const { id, name, phone } = bill.customer;
+      const storeName = bill.store.storeName;
+
+      if (!customerData.has(id)) {
+        customerData.set(id, {
+          customerName: name,
+          mobileNo: phone,
+          totalSales: 0,
+          purchaseFrequency: 0, // Fix: Count each bill separately
+          stores: new Map(),
+        });
+      }
+
+      const customerEntry = customerData.get(id);
+
+      // Update total sales
+      customerEntry.totalSales += bill.netAmount;
+
+      // Fix: Increment purchase frequency per bill, not per store
+      customerEntry.purchaseFrequency += 1;
+
+      // Track sales per store
+      if (!customerEntry.stores.has(storeName)) {
+        customerEntry.stores.set(storeName, 0);
+      }
+      customerEntry.stores.set(storeName, customerEntry.stores.get(storeName) + bill.netAmount);
+    });
+
+    // Convert Map to JSON-friendly format
+    const result = Array.from(customerData.values()).map((entry) => ({
+      customerName: entry.customerName,
+      mobileNo: entry.mobileNo,
+      totalSales: entry.totalSales,
+      purchaseFrequency: entry.purchaseFrequency, // Fix: Now counts every bill correctly
+      stores: Array.from(entry.stores.entries() as [string, number][]).map(([storeName, sales]) => ({
+        storeName,
+        sales,
+      })),
+    }));
+
+   res.json(result);
+   return;
+  } catch (error) {
+    console.error("Error fetching customer report:", error);
+   res.status(500).json({ error: "Internal server error" });
+    return;
+  }
+};
+
+
+
+

@@ -14,5 +14,6 @@ export const API_ROUTES = {
     SUMMARY: "/reports/summary",
     NON_BUYING_CUSTOMERS: "/reports/non-buying-customers",
     NON_BUYING_MONTHLY_CUSTOMERS: "/reports/non-buying-monthly-customers",
+    CUSTOMER_REPORT: "/reports/customer-report",
   };
   

@@ -15,5 +15,10 @@ export const API_ROUTES = {
     NON_BUYING_CUSTOMERS: "/reports/non-buying-customers",
     NON_BUYING_MONTHLY_CUSTOMERS: "/reports/non-buying-monthly-customers",
     CUSTOMER_REPORT: "/reports/customer-report",
+    STORE_SALES_REPORT: "/reports/store-sales-report",
+    CUSTOMERS: "/reports/customers",
+    YEARLY_REVENUE: "/reports/yearly",
+    MONTHLY_REVENUE: "/reports/monthly",
+    AVAILABLE_YEARS: "/reports/years",
   };
   

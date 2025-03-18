@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import api, { API_ROUTES } from "../utils/api";
+import CustomerList from "./CustomerList";
+import RevenueCharts from "./revenueChart"; // Import the RevenueCharts component
 
 export interface SummaryReport {
   totalCustomers: number;
@@ -21,6 +23,8 @@ const SummaryReport: React.FC = () => {
     queryKey: ["summary"],
     queryFn: getSummaryReport,
   });
+
+  const [showCustomerList, setShowCustomerList] = useState(false);
 
   if (isLoading)
     return (
@@ -53,7 +57,13 @@ const SummaryReport: React.FC = () => {
   };
 
   const metrics = [
-    { label: "Total Customers", value: data?.totalCustomers ?? 0, icon: "👥", color: "bg-blue-50 text-blue-700" },
+    {
+      label: "Total Customers",
+      value: data?.totalCustomers ?? 0,
+      icon: "👥",
+      color: "bg-blue-50 text-blue-700",
+      onClick: () => setShowCustomerList(!showCustomerList), // Toggle customer list
+    },
     { label: "Active Customers", value: data?.activeCustomers ?? 0, icon: "✅", color: "bg-green-50 text-green-700" },
     { label: "Inactive Customers", value: data?.inactiveCustomers ?? 0, icon: "⏸️", color: "bg-yellow-50 text-yellow-700" },
     { label: "Total Revenue", value: `₹${data?.totalRevenue?.toLocaleString() ?? 0}`, icon: "💰", color: "bg-purple-50 text-purple-700" },
@@ -78,7 +88,8 @@ const SummaryReport: React.FC = () => {
             key={metric.label}
             custom={index}
             variants={itemVariants}
-            className={`p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 ${metric.color}`}
+            className={`p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer ${metric.color}`}
+            onClick={metric.onClick} // Handle click event
           >
             <div className="flex items-center justify-between">
               <div>
@@ -89,6 +100,18 @@ const SummaryReport: React.FC = () => {
             </div>
           </motion.div>
         ))}
+      </div>
+
+      {/* Render CustomerList when Total Customers is clicked */}
+      {showCustomerList && (
+        <div className="mt-6">
+          <CustomerList />
+        </div>
+      )}
+
+      {/* Add RevenueCharts below the metrics */}
+      <div className="mt-8">
+        <RevenueCharts />
       </div>
     </motion.div>
   );

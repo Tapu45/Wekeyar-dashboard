@@ -39,4 +39,56 @@ export interface SummaryReport {
     storeName: string;
     sales: number;
   }
+
+  export interface StoreWiseSalesReport {
+    selectedDate: string;
+    storeReports: StoreReport[];
+  }
+  
+  export interface StoreReport {
+    storeName: string;
+    address: string;
+    salesData: SalesData;
+    trends: Trends;
+  }
+  
+  export interface SalesData {
+    totalNetAmount: number;
+    totalBills: number;
+    totalItemsSold: number;
+    isUploaded: boolean;
+  }
+  
+  export interface Trends {
+    previousDay: TrendData;
+    previousWeek: TrendData;
+    previousMonth: TrendData;
+  }
+  
+  export interface TrendData {
+    totalNetAmount: number;
+    totalBills: number;
+    totalItemsSold: number;
+    isUploaded: boolean;
+  }
+
+  export interface Customer {
+    name: string;
+    phone: string;
+    address: string;
+    status: "Active" | "Inactive";
+  }
+
+  export interface YearlyRevenue {
+    year: number;
+    revenue: number;
+  }
+
+  export interface MonthlyRevenue {
+    month: number;
+    monthName: string;
+    revenue: number;
+  }
+
+  export type AvailableYears = number[];
   

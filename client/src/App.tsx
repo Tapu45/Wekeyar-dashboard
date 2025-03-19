@@ -34,7 +34,6 @@ const App: React.FC = () => {
             }`}
           >
             <Routes>
-
               <Route path="/login" element={<Login />} />
               <Route
                 path="/"
@@ -84,8 +83,15 @@ const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
-              <Route path="/upload" element={ <ProtectedRoute> <UploadPage />   </ProtectedRoute>} />
-
+              <Route
+                path="/upload"
+                element={
+                  <ProtectedRoute>
+                    {" "}
+                    <UploadPage />{" "}
+                  </ProtectedRoute>
+                }
+              />
             </Routes>
           </div>
         </div>

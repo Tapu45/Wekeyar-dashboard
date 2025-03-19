@@ -25,12 +25,22 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-lg">
-        <h2 className="text-2xl font-bold mb-6 text-center text-blue-600">
-          Login
+    <div className="min-h-screen flex items-center justify-center bg-green-50">
+      <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-2xl">
+        {/* Logo Section */}
+        <div className="flex justify-center mb-6">
+          <img
+            src="/logo.png" // Replace with the actual path to your logo
+            alt="WekeyarPlus"
+            className="w-full h-24"
+          />
+        </div>
+        <h2 className="text-3xl font-bold mb-6 text-center text-blue-800">
+          Welcome to WekeyarPlus
         </h2>
-        {error && <div className="mb-4 text-red-600 text-center">{error}</div>}
+        {error && (
+          <div className="mb-4 text-red-600 text-center text-sm">{error}</div>
+        )}
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label htmlFor="username" className="block text-gray-700 mb-2">
@@ -43,7 +53,7 @@ const Login: React.FC = () => {
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Enter your username"
               required
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
             />
           </div>
           <div className="mb-6">
@@ -57,12 +67,12 @@ const Login: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
               required
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
             />
           </div>
           <button
             type="submit"
-            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-300"
+            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-300 transform hover:scale-105"
           >
             Login
           </button>

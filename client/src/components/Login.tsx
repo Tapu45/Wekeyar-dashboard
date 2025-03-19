@@ -25,7 +25,7 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-green-50">
+    <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-2xl">
         {/* Logo Section */}
         <div className="flex justify-center mb-6">

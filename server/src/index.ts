@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
+import authRoutes from "./routes/authRoutes";
 import routes from "./routes/routes";
 import uploadRoutes from "./routes/upload.route";
 import path from "path";
@@ -17,13 +19,17 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Enable CORS for all routes
+app.use(express.json()); // To parse JSON request bodies
+app.use(cookieParser()); // To parse cookies
+
+
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/reports", routes);
 app.use("/api", uploadRoutes);
+app.use("/auth", authRoutes); //
 
 // Error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

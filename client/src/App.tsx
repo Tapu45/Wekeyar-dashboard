@@ -9,6 +9,8 @@ import StoreWiseSalesReportPage from "./components/StoreReport";
 import Sidebar from "./components/Sidebar";
 import CustomerList from "./components/CustomerList";
 import UploadPage from "./components/UploadPage";
+import Login from "./components/Login";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -20,7 +22,10 @@ const App: React.FC = () => {
       <Router>
         <div className="flex h-screen">
           {/* Sidebar */}
-          <Sidebar isExpanded={isSidebarExpanded} setIsExpanded={setIsSidebarExpanded} />
+          <Sidebar
+            isExpanded={isSidebarExpanded}
+            setIsExpanded={setIsSidebarExpanded}
+          />
 
           {/* Main Content */}
           <div
@@ -29,13 +34,58 @@ const App: React.FC = () => {
             }`}
           >
             <Routes>
-              <Route path="/" element={<SummaryReport />} />
-              <Route path="/non-buying-customers" element={<NonBuyingCustomerReport />} />
-              <Route path="/non-buying-monthly-customers" element={<NonBuyingMonthlyCustomer />} />
-              <Route path="/customer-report" element={<CustomerReportPage />} />
-              <Route path="/store-sales-report" element={<StoreWiseSalesReportPage />} />
-              <Route path="/customers" element={<CustomerList />} />
-              <Route path="/upload" element={<UploadPage />} />
+
+              <Route path="/login" element={<Login />} />
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <SummaryReport />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/non-buying-customers"
+                element={
+                  <ProtectedRoute>
+                    <NonBuyingCustomerReport />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/non-buying-monthly-customers"
+                element={
+                  <ProtectedRoute>
+                    <NonBuyingMonthlyCustomer />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/customer-report"
+                element={
+                  <ProtectedRoute>
+                    <CustomerReportPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/store-sales-report"
+                element={
+                  <ProtectedRoute>
+                    <StoreWiseSalesReportPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/customers"
+                element={
+                  <ProtectedRoute>
+                    <CustomerList />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/upload" element={ <ProtectedRoute> <UploadPage />   </ProtectedRoute>} />
+
             </Routes>
           </div>
         </div>

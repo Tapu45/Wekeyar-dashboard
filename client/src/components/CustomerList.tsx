@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import api from "../utils/api";
 import { API_ROUTES } from "../utils/api";
 import { Customer } from "../utils/types";
-import { Search, Phone, MapPin, User, ChevronRight, Info } from "lucide-react";
+import { Search, Phone, MapPin, User, Info } from "lucide-react";
 
 const CustomerList: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -11,7 +11,7 @@ const CustomerList: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+  const [_selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
     null
   );
 
@@ -78,24 +78,24 @@ const CustomerList: React.FC = () => {
     },
   };
 
-  const overlayVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1 },
-  };
+  // const overlayVariants = {
+  //   hidden: { opacity: 0 },
+  //   visible: { opacity: 1 },
+  // };
 
-  const modalVariants = {
-    hidden: { opacity: 0, y: 50, scale: 0.9 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 25,
-      },
-    },
-  };
+  // const modalVariants = {
+  //   hidden: { opacity: 0, y: 50, scale: 0.9 },
+  //   visible: {
+  //     opacity: 1,
+  //     y: 0,
+  //     scale: 1,
+  //     transition: {
+  //       type: "spring",
+  //       stiffness: 300,
+  //       damping: 25,
+  //     },
+  //   },
+  // };
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 max-w-6xl mx-auto">
@@ -206,7 +206,6 @@ const CustomerList: React.FC = () => {
                     <p className="truncate">{customer.address}</p>
                   </div>
                 </div>
-               
               </motion.div>
             ))}
           </AnimatePresence>

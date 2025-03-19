@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { SummaryReport, NonBuyingCustomer, MonthlyNonBuyingCustomer } from "src/types/types";
 import { subDays, subWeeks, subMonths } from "date-fns";
 
-const prisma = new PrismaClient();
+export const prisma = new PrismaClient();
 
 /**
  * 1. Summary Report
@@ -106,14 +106,12 @@ export const getNonBuyingCustomers = async (req: Request, res: Response) => {
 export const getNonBuyingMonthlyCustomers = async (_req: Request, res: Response) => {
   try {
     const currentDate = new Date();
-    const lastMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
+    const currentMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
 
     const customers = await prisma.customer.findMany({
       where: {
         bills: {
-          some: { date: { lt: lastMonthStart } },
-          none: { date: { gte: lastMonthStart, lte: lastMonthEnd } },
+          none: { date: { gte: currentMonthStart } }, // No bills in the current month
         },
       },
       select: {
@@ -147,6 +145,7 @@ export const getNonBuyingMonthlyCustomers = async (_req: Request, res: Response)
     res.status(500).json({ error: "Internal server error", details: error });
   }
 };
+
 
 /**
  * 4. Customer Purchase History

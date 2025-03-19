@@ -20,5 +20,8 @@ export const API_ROUTES = {
     YEARLY_REVENUE: "/reports/yearly",
     MONTHLY_REVENUE: "/reports/monthly",
     AVAILABLE_YEARS: "/reports/years",
+    LOGIN: "/auth/login",
+    LOGOUT: "/auth/logout",
+    CHECK_AUTH: "/auth/check-auth",
   };
   

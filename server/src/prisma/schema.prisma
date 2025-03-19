@@ -19,28 +19,32 @@ model Customer {
 
 model Store {
   id        Int      @id @default(autoincrement())
-  storeName String
+  storeName String   @unique
   address   String?
+  phone     String?  // Add this field
+  email     String?  // Add this field
   bills     Bill[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Bill {
-  id          Int           @id @default(autoincrement())
-  billNo      String        @unique
-  customerId  Int
-  storeId     Int
-  date        DateTime      @default(now())
-  netDiscount Float // Total discount on bill
-  netAmount   Float // Final bill amount after discount
-  isUploaded  Boolean       @default(false) // To track whether the bill is uploaded
-  billDetails BillDetails[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  customer Customer @relation(fields: [customerId], references: [id])
-  store    Store    @relation(fields: [storeId], references: [id])
+  id           Int           @id @default(autoincrement())
+  billNo       String        @unique
+  customerId   Int
+  storeId      Int
+  date         DateTime      @default(now())
+  netDiscount  Float
+  netAmount    Float
+  amountPaid   Float
+  creditAmount Float
+  paymentType  String
+  isUploaded   Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  customer     Customer      @relation(fields: [customerId], references: [id])
+  store        Store         @relation(fields: [storeId], references: [id])
+  billDetails  BillDetails[]
 }
 
 model BillDetails {
@@ -53,6 +57,15 @@ model BillDetails {
   discount  Float
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
+  expBatch  String
   bill Bill @relation(fields: [billId], references: [id])
+}
+
+model UploadHistory {
+  id         Int      @id @default(autoincrement())
+  fileName   String
+  uploadDate DateTime @default(now())
+  status     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

@@ -8,6 +8,7 @@ import CustomerReportPage from "./components/CustomerReport";
 import StoreWiseSalesReportPage from "./components/StoreReport";
 import Sidebar from "./components/Sidebar";
 import CustomerList from "./components/CustomerList";
+import UploadPage from "./components/UploadPage";
 import Login from "./components/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -33,6 +34,7 @@ const App: React.FC = () => {
             }`}
           >
             <Routes>
+
               <Route path="/login" element={<Login />} />
               <Route
                 path="/"
@@ -82,6 +84,8 @@ const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
+              <Route path="/upload" element={ <ProtectedRoute> <UploadPage />   </ProtectedRoute>} />
+
             </Routes>
           </div>
         </div>

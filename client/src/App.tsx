@@ -8,6 +8,7 @@ import CustomerReportPage from "./components/CustomerReport";
 import StoreWiseSalesReportPage from "./components/StoreReport";
 import Sidebar from "./components/Sidebar";
 import CustomerList from "./components/CustomerList";
+import UploadPage from "./components/UploadPage";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ const App: React.FC = () => {
               <Route path="/customer-report" element={<CustomerReportPage />} />
               <Route path="/store-sales-report" element={<StoreWiseSalesReportPage />} />
               <Route path="/customers" element={<CustomerList />} />
+              <Route path="/upload" element={<UploadPage />} />
             </Routes>
           </div>
         </div>

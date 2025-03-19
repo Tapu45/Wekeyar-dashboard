@@ -20,5 +20,10 @@ export const API_ROUTES = {
     YEARLY_REVENUE: "/reports/yearly",
     MONTHLY_REVENUE: "/reports/monthly",
     AVAILABLE_YEARS: "/reports/years",
+    UPLOAD: "/api/upload",
+    UPLOAD_SYNC: "/api/upload/sync",
+    UPLOAD_HISTORY: "/api/upload/history",
+    UPLOAD_STATUS: "/api/upload/status/:id",
+    UPLOAD_HISTORY_DELETE: "/api/upload/history/:id?",
   };
   

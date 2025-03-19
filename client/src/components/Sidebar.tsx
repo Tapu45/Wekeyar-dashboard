@@ -9,6 +9,7 @@ import {
   BarChart3,
   ClipboardList,
   Store,
+  UploadCloud,
 } from "lucide-react";
 
 interface SidebarLink {
@@ -30,6 +31,7 @@ const Sidebar: React.FC<{
     { title: "Monthly Non-Buying", path: "/non-buying-monthly-customers", icon: ClipboardList },
     { title: "Customer Report", path: "/customer-report", icon: BarChart3 },
     { title: "Store Sales Report", path: "/store-sales-report", icon: Store },
+    { title: "upload", path: "/upload", icon: UploadCloud },
   ];
 
   const isActivePath = (path: string) => location.pathname === path;

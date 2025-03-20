@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api, { API_ROUTES } from "../utils/api";
+import DashboardLayout from "./DashboardLayout";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
@@ -27,8 +28,9 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     }
   }, [isLoading, data, error, navigate, token]);
 
-  if (isLoading) return <div>Loading...</div>;
-  return <>{children}</>;
+  if (isLoading) return <div className="flex h-screen items-center justify-center">Loading...</div>;
+  
+  return <DashboardLayout>{children}</DashboardLayout>;
 };
 
 export default ProtectedRoute;

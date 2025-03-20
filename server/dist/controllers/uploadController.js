@@ -43,6 +43,7 @@ const fs_1 = __importDefault(require("fs"));
 const worker_threads_1 = require("worker_threads");
 const path_1 = __importDefault(require("path"));
 const Websocket_1 = require("../utils/Websocket");
+const cloudinary_1 = __importDefault(require("../utils/cloudinary"));
 const prisma = new client_1.PrismaClient();
 const uploadExcelFile = async (req, res) => {
     try {
@@ -53,9 +54,17 @@ const uploadExcelFile = async (req, res) => {
         }
         const filePath = req.file.path;
         const fileName = req.file.originalname;
+        console.log(`Uploading file to Cloudinary: ${filePath}`);
+        const cloudinaryResult = await cloudinary_1.default.uploader.upload(filePath, {
+            folder: "uploads",
+            resource_type: "raw",
+        });
+        console.log("File uploaded to Cloudinary:", cloudinaryResult.secure_url);
+        fs_1.default.unlinkSync(filePath);
         const uploadHistory = await prisma.uploadHistory.create({
             data: {
                 fileName,
+                fileUrl: cloudinaryResult.secure_url,
                 status: "in-progress",
             },
         });
@@ -70,7 +79,7 @@ const uploadExcelFile = async (req, res) => {
             return;
         }
         const worker = new worker_threads_1.Worker(workerPath, {
-            workerData: { filePath },
+            workerData: { fileUrl: cloudinaryResult.secure_url },
         });
         worker.on("message", async (message) => {
             if (message.status === "progress") {

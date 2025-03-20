@@ -13,18 +13,15 @@ import {
   FileText,
   BarChart,
   AlertTriangle,
-  FileCheck,
   Cpu,
   BarChart3,
   ArrowDownUp,
-  ArrowDownToLine,
   ActivitySquare,
   Zap,
   ShieldCheck,
 } from "lucide-react";
 import { API_ROUTES } from "../utils/api";
 import api from "../utils/api";
-import { io } from "socket.io-client";
 
 const FileUpload: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -35,9 +32,7 @@ const FileUpload: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"recent" | "all">("recent");
   const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
-  const [progress, setProgress] = useState<number>(0);
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  
+
 
   // Fetch upload history on component mount
   useEffect(() => {

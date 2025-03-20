@@ -1,129 +1,87 @@
 const { workerData, parentPort } = require('worker_threads');
-const ExcelJS = require('exceljs');
+const XLSX = require('xlsx');
 const { PrismaClient } = require('@prisma/client');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const stream = require('stream');
-const { promisify } = require('util');
-const pipeline = promisify(stream.pipeline);
 
 
-// Create a Prisma client with correct configuration
-const prisma = new PrismaClient({
-  log: ['error'],
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL
-    }
-  }
-});
-
-// Reduced batch size to prevent connection pool exhaustion
-const BATCH_SIZE = 50;
-
-// Helper function to execute operations with retry logic
-async function executeWithRetry(operation, maxRetries = 3) {
-  let lastError;
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      if ((error.message.includes('connection pool') || error.message.includes('timed out')) && attempt < maxRetries) {
-        console.log(`Retrying operation, attempt ${attempt}/${maxRetries}`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        lastError = error;
-      } else {
-        throw error;
-      }
-    }
-  }
-  throw lastError;
-}
+const prisma = new PrismaClient();
 
 async function processExcelFile() {
-  let tempFilePath = '';
-  let currentProgress = 0;
   try {
     const { fileUrl } = workerData;
     console.log(`Downloading file from Cloudinary: ${fileUrl}`);
-    
-    // Download file using streaming to reduce memory usage
-    tempFilePath = path.join(__dirname, "temp.xlsx");
-    const writer = fs.createWriteStream(tempFilePath);
-    
-    const response = await axios({
-      method: 'get',
-      url: fileUrl,
-      responseType: 'stream'
-    });
-    
-    await pipeline(response.data, writer);
+
+      // Download the file from Cloudinary
+      const response = await axios.get(fileUrl, { responseType: "arraybuffer" });
+      const tempFilePath = path.join(__dirname, "temp.xlsx");
+
+      // / Save the downloaded file to a temporary location
+    fs.writeFileSync(tempFilePath, response.data);
     console.log(`File downloaded and saved to: ${tempFilePath}`);
     
+    // Read the Excel file
+    const workbook = XLSX.readFile(tempFilePath, {
+      cellDates: true,
+      rawNumbers: false
+    });
+    
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    
+    // Convert to JSON
+    const data = XLSX.utils.sheet_to_json(worksheet, { defval: "", header: 'A' });
+    console.log(`Parsed ${data.length} rows from Excel file`);
+
+    // Clean up the temporary file
+    fs.unlinkSync(tempFilePath);
+    
     // Track progress
-    const startTime = Date.now();
+    const totalRows = data.length;
+    let processedRows = 0;
+    
     const storeMap = new Map();
     const customerMap = new Map();
     let billMap = new Map();
     let totalBills = 0;
     let totalItems = 0;
-
-    // Store information - we'll extract this from the first few rows
-    let storeInfo = {
-      name: '',
-      address: '',
-      phone: '',
-      email: ''
-    };
     
-    // Initialize processing state
-    let currentCustomer = null;
-    let currentBill = null;
-    let lastValidDate = new Date();
-    let currentCustomerBills = [];
-    let billRecords = [];
-    let rowCount = 0;
-    let processedRows = 0;
-    let lastProgressUpdate = 0;
+    // Extract store information from the top of the file
+    let storeName = '';
+    let storeAddress = '';
+    let storePhone = '';
+    let storeEmail = '';
     
-    // Create an ExcelJS workbook and stream rows from the file
-    const workbook = new ExcelJS.Workbook();
-    console.time('Excel parsing');
-    
-    await workbook.xlsx.readFile(tempFilePath);
-    const worksheet = workbook.getWorksheet(1); // Get the first worksheet
-    rowCount = worksheet.rowCount;
-    
-    console.timeEnd('Excel parsing');
-    console.log(`Found ${rowCount} rows in Excel file`);
-    
-    // Extract store information from the first few rows
-    for (let i = 1; i <= Math.min(10, rowCount); i++) {
-      const row = worksheet.getRow(i);
-      const rowValueArray = [];
+    // Scan first few rows for store information - IMPROVED LOGIC
+    for (let i = 0; i < Math.min(10, data.length); i++) {
+      const row = data[i];
       
-      row.eachCell((cell) => {
-        rowValueArray.push(cell.value ? String(cell.value).trim() : "");
-      });
+      // Extract row values as array to make processing easier
+      const rowValues = Object.values(row).map(val => String(val || "").trim());
+      const rowString = rowValues.join(' ');
       
-      const rowString = rowValueArray.join(' ');
-      
-      // Look for store name
-      if (!storeInfo.name && rowValueArray[0] && 
+      // Look for store name (first non-empty row that doesn't contain specific keywords)
+      if (!storeName && rowString && 
           !rowString.includes('SALES STATEMENT') && 
           !rowString.includes('PLOT NO') &&
           !rowString.includes('Phone :')) {
-        storeInfo.name = rowValueArray[0].trim();
+        // Get the value from column A directly - this is typically where the store name is
+        if (row.A && typeof row.A === 'string' && row.A.trim()) {
+          storeName = row.A.trim();
+          console.log(`Found store name: "${storeName}"`);
+        }
       }
       
-      // Look for address
-      if (!storeInfo.address && rowString && 
+      // Look for address (typically contains "PLOT NO", "DISTRICT", etc.)
+      if (!storeAddress && rowString && 
           (rowString.includes('PLOT NO') || 
            rowString.includes('AT.PLOT') || 
            rowString.includes('PIN CODE'))) {
-        if (rowValueArray[0]) {
-          storeInfo.address = rowValueArray[0].trim();
+        // Get the value from column A directly - this is typically where the address is
+        if (row.A && typeof row.A === 'string' && row.A.trim()) {
+          storeAddress = row.A.trim();
+          console.log(`Found store address: "${storeAddress}"`);
         }
       }
       
@@ -132,47 +90,72 @@ async function processExcelFile() {
         const phoneMatch = rowString.match(/Phone\s*:\s*(\d+)/);
         const emailMatch = rowString.match(/E-Mail\s*:\s*([^\s]+)/);
         
-        if (phoneMatch) storeInfo.phone = phoneMatch[1];
-        if (emailMatch) storeInfo.email = emailMatch[1];
+        if (phoneMatch) {
+          storePhone = phoneMatch[1];
+          console.log(`Found store phone: "${storePhone}"`);
+        }
+        
+        if (emailMatch) {
+          storeEmail = emailMatch[1];
+          console.log(`Found store email: "${storeEmail}"`);
+        }
       }
     }
     
-    console.log(`Extracted store information: ${JSON.stringify(storeInfo)}`);
+    console.log(`Extracted store information: 
+      Name: ${storeName}
+      Address: ${storeAddress}
+      Phone: ${storePhone}
+      Email: ${storeEmail}`);
     
-    // Use more efficient data structure for row processing (array instead of objects)
-    const sheetRows = [];
-    
-    // Fast pass to convert to memory-efficient array structure
-    worksheet.eachRow((row, rowNumber) => {
-      const rowArray = [];
-      row.eachCell((cell) => {
-        rowArray.push(cell.value);
-      });
-      sheetRows.push(rowArray);
-    });
-    
-    // Helper functions for row classification using arrays
-    function isCustomerHeader(rowArray) {
-      return rowArray.some(value => {
-        if (!value) return false;
-        const strValue = String(value).trim();
-        return /^\d{9,10}\s+\w/.test(strValue);
-      });
+    // If store name is still empty, use default - BUT ONLY AS A FALLBACK
+    if (!storeName) {
+      storeName = 'WEKEYAR PLUS';
+      console.log('Using default store name: WEKEYAR PLUS');
     }
     
-    function isDateRow(rowArray) {
-      return rowArray.some(value => {
-        if (!value) return false;
-        const strValue = String(value).trim();
-        return /^\d{2}-\d{2}-\d{4}$/.test(strValue);
-      });
+    if (!storeAddress) {
+      storeAddress = 'AT.PLOT NO.210,DISTRICT CENTRE, PO.CHANDRASEKHARPUR, BHUBANESWAR,ODISHA';
+      console.log('Using default store address');
     }
     
-    function extractCustomerInfo(rowArray) {
-      for (const value of rowArray) {
-        if (!value) continue;
-        const strValue = String(value).trim();
-        const match = strValue.match(/^(\d+)\s+(.+)$/);
+    // Extract bill records from the data
+    const billRecords = [];
+    let currentBill = null;
+    let currentCustomer = null;
+    let lastValidDate = new Date(); // Default date
+    
+    // Helper function to check if a row contains a customer header
+    function isCustomerHeader(row) {
+      // Check for numeric values at the start of any field
+      for (const key in row) {
+        const value = String(row[key] || "");
+        // Look for patterns like "9861502588 A K SEN" or similar phone number patterns
+        if (/^\d{9,10}\s+\w/.test(value)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    
+    // Helper function to check if a row is a date row (follows customer header)
+    function isDateRow(row) {
+      // Look for date pattern DD-MM-YYYY in any field
+      for (const key in row) {
+        const value = String(row[key] || "");
+        if (/^\d{2}-\d{2}-\d{4}$/.test(value)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    
+    // Helper function to extract customer phone and name
+    function extractCustomerInfo(row) {
+      for (const key in row) {
+        const value = String(row[key] || "");
+        // Match phone number pattern followed by customer name
+        const match = value.match(/^(\d+)\s+(.+)$/);
         if (match) {
           return {
             phone: match[1],
@@ -183,88 +166,102 @@ async function processExcelFile() {
       return { phone: "unknown", customerName: "Unknown" };
     }
     
-    function extractDate(rowArray) {
-      for (const value of rowArray) {
-        if (!value) continue;
-        const strValue = String(value).trim();
-        if (/^\d{2}-\d{2}-\d{4}$/.test(strValue)) {
-          const [day, month, year] = strValue.split("-");
+    // Helper function to extract date
+    function extractDate(row) {
+      for (const key in row) {
+        const value = String(row[key] || "");
+        // Match date pattern DD-MM-YYYY
+        if (/^\d{2}-\d{2}-\d{4}$/.test(value)) {
+          const [day, month, year] = value.split("-");
           const date = new Date(`${year}-${month}-${day}`);
-          lastValidDate = date;
+          lastValidDate = date; // Store the last valid date
           return date;
         }
       }
-      return lastValidDate;
+      return lastValidDate; // Return the last valid date if no date found
     }
     
-    function isBillNumberRow(rowArray) {
-      return rowArray.some(value => {
-        if (!value) return false;
-        const strValue = String(value).trim();
-        return /^(CS\/\d+|CN\d+)$/.test(strValue);
-      });
+    // Helper to check if a row contains bill number (CS/XXXXX or CN/XXXXX)
+    function isBillNumberRow(row) {
+      for (const key in row) {
+        const value = String(row[key] || "");
+        // Look for patterns like "CS/35866" or "CN/12345"
+        if (/^(CS\/\d+|CN\d+)$/.test(value)) {
+          return true;
+        }
+      }
+      return false;
     }
     
-    function extractBillNumber(rowArray) {
-      for (const value of rowArray) {
-        if (!value) continue;
-        const strValue = String(value).trim();
-        if (/^(CS\/\d+|CN\d+)$/.test(strValue)) {
-          return strValue;
+    // Helper to extract bill number
+    function extractBillNumber(row) {
+      for (const key in row) {
+        const value = String(row[key] || "");
+        // Extract bill number pattern like "CS/35866" or "CN/12345"
+        if (/^(CS\/\d+|CN\d+)$/.test(value)) {
+          return value;
         }
       }
       return null;
     }
     
-    function isItemRow(rowArray) {
+    // Helper to check if a row is an item row
+    function isItemRow(row) {
       let hasQuantity = false;
       let hasDescription = false;
       let hasBatch = false;
       
-      for (const value of rowArray) {
-        if (!value) continue;
-        const strValue = String(value).trim();
+      for (const key in row) {
+        const value = String(row[key] || "");
         
-        if (/^\d+\.0$/.test(strValue)) {
+        // Check for quantity (often 1.0, 2.0, etc.)
+        if (/^\d+\.0$/.test(value)) {
           hasQuantity = true;
         }
         
-        if (/^\d+\/\d+\s+\w+/.test(strValue)) {
+        // Check for batch codes (match patterns in your image)
+        if (/^\d+\/\d+\s+\w+/.test(value)) {
           hasBatch = true;
         }
         
-        if (strValue.length > 5 && /[A-Z\-]/.test(strValue) && !/^\d/.test(strValue)) {
+        // Description usually has uppercase letters and various medicine names
+        if (value.length > 5 && /[A-Z\-]/.test(value) && !/^\d/.test(value)) {
           hasDescription = true;
         }
       }
       
+      // We consider it an item row if it has at least a description and either quantity or batch
       return hasDescription && (hasQuantity || hasBatch);
     }
     
-    function extractItemDetails(rowArray) {
+    // Helper to extract item details
+    function extractItemDetails(row) {
       let name = "";
       let quantity = 1;
       let batch = "";
       let mrp = 0;
       
-      for (const value of rowArray) {
-        if (!value) continue;
-        const strValue = String(value).trim();
+      for (const key in row) {
+        const value = String(row[key] || "");
         
-        if (strValue.length > 5 && /[A-Z\-]/.test(strValue) && !/^\d/.test(strValue)) {
-          name = strValue;
+        // Find description (medicine name)
+        if (value.length > 5 && /[A-Z\-]/.test(value) && !/^\d/.test(value)) {
+          name = value;
         }
         
-        if (/^\d+\.0$/.test(strValue)) {
-          quantity = parseFloat(strValue);
+        // Find quantity
+        if (/^\d+\.0$/.test(value)) {
+          quantity = parseFloat(value);
         }
         
-        if (/^\d+\/\d+\s+\w+/.test(strValue)) {
-          batch = strValue;
+        // Find batch code
+        if (/^\d+\/\d+\s+\w+/.test(value)) {
+          batch = value;
         }
         
-        const numValue = parseFloat(strValue);
-        if (!isNaN(numValue) && numValue > 10) {
+        // Find price (MRP) - usually a numeric value
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue > 10) { // Assuming prices are greater than 10
           mrp = numValue;
         }
       }
@@ -272,96 +269,125 @@ async function processExcelFile() {
       return { name, quantity, batch, expBatch: batch, mrp };
     }
     
-    function isBillTotal(rowArray) {
-      return rowArray.some(value => {
-        if (!value) return false;
-        const strValue = String(value).trim();
-        return strValue.includes("TOTAL AMOUNT");
-      });
+    // Helper to check if a row contains bill total information
+    function isBillTotal(row) {
+      for (const key in row) {
+        const value = String(row[key] || "");
+        // Look for "TOTAL AMOUNT :" pattern
+        if (value.includes("TOTAL AMOUNT")) {
+          return true;
+        }
+      }
+      return false;
     }
     
-    function extractTotalAmount(rowArray) {
+    // Helper to extract total amount
+    function extractTotalAmount(row) {
       let totalAmount = 0;
       
-      for (let i = 0; i < rowArray.length; i++) {
-        const value = rowArray[i];
-        if (!value) continue;
+      // First check if there's a column with "TOTAL AMOUNT :"
+      for (const key in row) {
+        const value = String(row[key] || "");
         
-        const strValue = String(value).trim();
-        if (strValue.includes("TOTAL AMOUNT")) {
-          // Check adjacent cells for the amount
-          for (let j = i+1; j < Math.min(rowArray.length, i+3); j++) {
-            const amountValue = rowArray[j];
+        if (value.includes("TOTAL AMOUNT")) {
+          // Look for the number in the same row
+          for (const amountKey in row) {
+            // Skip if the key itself contains "TOTAL AMOUNT"
+            if (String(amountKey).includes("TOTAL AMOUNT")) continue;
+            
+            const amountValue = row[amountKey];
             if (amountValue && !isNaN(parseFloat(amountValue))) {
-              return parseFloat(amountValue);
+              const numValue = parseFloat(amountValue);
+              if (numValue > 0) {
+                totalAmount = numValue;
+                break;
+              }
             }
           }
         }
       }
       
-      // If we didn't find the total with "TOTAL AMOUNT" label, look for numbers in columns C-D
-      if (rowArray[2] && !isNaN(parseFloat(rowArray[2]))) {
-        totalAmount = parseFloat(rowArray[2]);
-      } else if (rowArray[3] && !isNaN(parseFloat(rowArray[3]))) {
-        totalAmount = parseFloat(rowArray[3]);
-      }
-      
-      return totalAmount;
-    }
-    
-    function extractCashAndCredit(rowArray, billNo) {
-      let cash = 0;
-      let credit = 0;
-      
-      // Check if this row contains the bill number
-      const billIndex = rowArray.findIndex(value => 
-        value && String(value).trim() === billNo
-      );
-      
-      if (billIndex >= 0) {
-        // Cash is typically the second-to-last column
-        // Credit is typically the last column
-        if (rowArray.length >= billIndex + 3) {
-          const cashValue = rowArray[rowArray.length - 2];
-          const creditValue = rowArray[rowArray.length - 1];
-          
-          if (cashValue && !isNaN(parseFloat(cashValue))) {
-            cash = parseFloat(cashValue);
-          }
-          
-          if (creditValue && !isNaN(parseFloat(creditValue))) {
-            credit = parseFloat(creditValue);
-            // Handle negative credit values
-            if (credit < 0) credit = Math.abs(credit);
+      // If we didn't find a total using the column method, try to find it directly
+      if (totalAmount === 0) {
+        // In your image, the total amount appears to be in a specific column
+        for (const key in row) {
+          if (key === 'C' || key === 'D') { // Column might be between QTY and CASH
+            const value = row[key];
+            if (value && !isNaN(parseFloat(value))) {
+              totalAmount = parseFloat(value);
+            }
           }
         }
       }
       
+      console.log(`Extracted total amount: ${totalAmount}`);
+      return totalAmount;
+    }
+
+    // Helper to extract cash and credit amounts directly from the row
+    function extractCashAndCredit(row, billNo) {
+      let cash = 0;
+      let credit = 0;
+      
+      // First check if this is a row that actually contains the bill number
+      let isBillRow = false;
+      for (const key in row) {
+        if (String(row[key]) === billNo) {
+          isBillRow = true;
+          break;
+        }
+      }
+      
+      // If this is the specific bill's row, extract cash and credit from corresponding columns
+      if (isBillRow) {
+        const columns = Object.keys(row);
+        // In your image, CASH is typically the second-to-last column
+        // and CREDIT is the last column
+        if (columns.length >= 2) {
+          const cashColumn = columns[columns.length - 2];
+          const creditColumn = columns[columns.length - 1];
+          
+          if (row[cashColumn] && !isNaN(parseFloat(row[cashColumn]))) {
+            cash = parseFloat(row[cashColumn]);
+          }
+          
+          if (row[creditColumn] && !isNaN(parseFloat(row[creditColumn]))) {
+            credit = parseFloat(row[creditColumn]);
+            // Handle negative credit values
+            if (credit < 0) {
+              credit = Math.abs(credit);
+            }
+          }
+        }
+      }
+      
+      console.log(`For bill ${billNo}: Cash=${cash}, Credit=${credit}`);
       return { cash, credit };
     }
     
-    // Process all rows with optimized loop
-    console.time('Row processing');
-    for (let i = 0; i < sheetRows.length; i++) {
-      const rowArray = sheetRows[i];
-
+    // Main processing loop
+    let currentCustomerBills = []; // Track bills for the current customer
+    let lastProgressUpdate = 0; // Track the last progress percentage sent
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      console.log("Processing row:", JSON.stringify(row));
       
-      
-      // Customer header row
-      if (isCustomerHeader(rowArray)) {
-        // Save previous customer's bills
+      // Check for customer header - start a new customer
+      if (isCustomerHeader(row)) {
+        // Save any previous customer's bills
         if (currentCustomerBills.length > 0) {
           billRecords.push(...currentCustomerBills);
           currentCustomerBills = [];
         }
         
-        const customerInfo = extractCustomerInfo(rowArray);
+        // Extract customer info
+        const customerInfo = extractCustomerInfo(row);
         
         // Check if next row contains the date
-        let date = lastValidDate;
-        if (i + 1 < sheetRows.length && isDateRow(sheetRows[i + 1])) {
-          date = extractDate(sheetRows[i + 1]);
-          i++; // Skip date row
+        let date = lastValidDate; // Default to the last valid date
+        if (i + 1 < data.length && isDateRow(data[i + 1])) {
+          date = extractDate(data[i + 1]);
+          i++; // Skip the date row in next iteration
         }
         
         currentCustomer = {
@@ -369,11 +395,14 @@ async function processExcelFile() {
           name: customerInfo.customerName,
           date: date
         };
-      }
-      // Bill number row
-      else if (currentCustomer && isBillNumberRow(rowArray)) {
-        const billNo = extractBillNumber(rowArray);
         
+        console.log(`Created new customer record: ${customerInfo.customerName} with phone ${customerInfo.phone}`);
+      }
+      // Check for bill number row - start a new bill but keep the same customer
+      else if (currentCustomer && isBillNumberRow(row)) {
+        const billNo = extractBillNumber(row);
+        
+        // Create a new bill with the same customer info
         const newBill = {
           billNo: billNo,
           customerPhone: currentCustomer.phone,
@@ -385,92 +414,127 @@ async function processExcelFile() {
           credit: 0
         };
         
-        const payments = extractCashAndCredit(rowArray, billNo);
+        // Extract cash and credit specifically for this bill number
+        const payments = extractCashAndCredit(row, billNo);
         newBill.cash = payments.cash;
         newBill.credit = payments.credit;
         
         currentCustomerBills.push(newBill);
-        currentBill = newBill;
+        currentBill = newBill; // Set this as the current bill for adding items
+        
+        console.log(`Created new bill: ${billNo} with Cash=${newBill.cash}, Credit=${newBill.credit}`);
       }
-      // Item row
-      else if (currentBill && isItemRow(rowArray)) {
-        const item = extractItemDetails(rowArray);
+      // Check for item rows
+      else if (currentBill && isItemRow(row)) {
+        const item = extractItemDetails(row);
+        
+        // Add item to current bill
         currentBill.items.push(item);
+        
+        console.log(`Added item to bill ${currentBill.billNo}: ${item.name}`);
       }
-      // Bill total row
-      else if (currentCustomerBills.length > 0 && isBillTotal(rowArray)) {
+      // Check for bill total - this might be for a specific bill within the customer section
+      else if (currentCustomerBills.length > 0 && isBillTotal(row)) {
         // Try to determine which bill this total belongs to
         let billIndex = -1;
         let billNo = null;
         
-        for (const value of rowArray) {
-          if (!value) continue;
-          const strValue = String(value).trim();
-          if (/^(CS\/\d+|CN\d+)$/.test(strValue)) {
-            billNo = strValue;
+        // First check if the row contains a bill number
+        for (const key in row) {
+          const value = String(row[key] || "");
+          if (/^(CS\/\d+|CN\d+)$/.test(value)) {
+            billNo = value;
             break;
           }
         }
         
+        // If we found a bill number, find the matching bill
         if (billNo) {
           billIndex = currentCustomerBills.findIndex(bill => bill.billNo === billNo);
         } else {
-          billIndex = currentCustomerBills.length - 1;
+          // If no bill number in this row, it might be a summary row for the current bill
+          billIndex = currentCustomerBills.length - 1; // Default to the last bill
         }
         
+        // If we found a matching bill, update its total
         if (billIndex >= 0) {
-          const totalAmount = extractTotalAmount(rowArray);
+          const totalAmount = extractTotalAmount(row);
           currentCustomerBills[billIndex].totalAmount = totalAmount;
           
-          // Try to get payment info if not already available
+          // If we don't have payment information yet, try to extract it here
           if (currentCustomerBills[billIndex].cash === 0 && currentCustomerBills[billIndex].credit === 0) {
-            for (let j = Math.max(0, i-3); j <= Math.min(sheetRows.length-1, i+3); j++) {
-              const nearbyRow = sheetRows[j];
+            // Try to find payment information in nearby rows
+            for (let j = Math.max(0, i-3); j <= Math.min(data.length-1, i+3); j++) {
+              const nearbyRow = data[j];
               
-              const billNoIndex = nearbyRow.findIndex(value => 
-                value && String(value).trim() === currentCustomerBills[billIndex].billNo
-              );
+              // Check if this row contains the bill number
+              let containsBillNo = false;
+              for (const key in nearbyRow) {
+                if (String(nearbyRow[key]) === currentCustomerBills[billIndex].billNo) {
+                  containsBillNo = true;
+                  break;
+                }
+              }
               
-              if (billNoIndex >= 0) {
+              if (containsBillNo) {
+                // Extract payments from this row
                 const payments = extractCashAndCredit(nearbyRow, currentCustomerBills[billIndex].billNo);
                 if (payments.cash > 0 || payments.credit !== 0) {
                   currentCustomerBills[billIndex].cash = payments.cash;
                   currentCustomerBills[billIndex].credit = payments.credit;
+                  console.log(`Found payment info for bill ${currentCustomerBills[billIndex].billNo}: Cash=${payments.cash}, Credit=${payments.credit}`);
                   break;
                 }
               }
             }
           }
+          
+          console.log(`Set total amount for bill ${currentCustomerBills[billIndex].billNo}: ${totalAmount}`);
         }
       }
       // Special handling for tables with multiple bills
-      else if (rowArray && currentCustomerBills.length > 0) {
+      else if (row && currentCustomerBills.length > 0) {
+        // Check if this row contains a bill number and payment information
         let billNo = null;
-        for (const value of rowArray) {
-          if (!value) continue;
-          const strValue = String(value).trim();
-          if (/^(CS|CN)\/\d+$/.test(strValue)) {
-            billNo = strValue;
+        for (const key in row) {
+          const value = String(row[key] || "");
+          if (/^(CS|CN)\/\d+$/.test(value)) {
+            billNo = value;
             break;
           }
         }
         
         if (billNo) {
+          // Find the matching bill
           const billIndex = currentCustomerBills.findIndex(bill => bill.billNo === billNo);
           
           if (billIndex >= 0) {
-            const payments = extractCashAndCredit(rowArray, billNo);
-            if (payments.cash > 0 || payments.credit !== 0) {
-              currentCustomerBills[billIndex].cash = payments.cash;
-              currentCustomerBills[billIndex].credit = payments.credit;
+            // Extract payment information for this specific bill
+            const columns = Object.keys(row);
+            if (columns.length >= 2) {
+              const cashColumn = columns[columns.length - 2];
+              const creditColumn = columns[columns.length - 1];
+              
+              if (row[cashColumn] && !isNaN(parseFloat(row[cashColumn]))) {
+                currentCustomerBills[billIndex].cash = parseFloat(row[cashColumn]);
+              }
+              
+              if (row[creditColumn] && !isNaN(parseFloat(row[creditColumn]))) {
+                let creditValue = parseFloat(row[creditColumn]);
+                currentCustomerBills[billIndex].credit = creditValue < 0 ? Math.abs(creditValue) : creditValue;
+              }
+              
+              console.log(`Updated payment info for bill ${billNo}: Cash=${currentCustomerBills[billIndex].cash}, Credit=${currentCustomerBills[billIndex].credit}`);
             }
           }
         }
       }
       
       processedRows++;
-      const currentProgress = (processedRows / rowCount) * 100;
-      if (currentProgress - lastProgressUpdate >= 1 || i === sheetRows.length - 1) {
+      // Update progress more frequently - calculate percentage with decimal precision
+      const currentProgress = (processedRows / totalRows) * 100;
+      if (currentProgress - lastProgressUpdate >= 0.1 || i === data.length - 1) {
+        console.log(`Progress: ${currentProgress.toFixed(1)}%`); // Debug log
         parentPort.postMessage({
           status: 'progress',
           progress: parseFloat(currentProgress.toFixed(1))
@@ -478,235 +542,186 @@ async function processExcelFile() {
         lastProgressUpdate = currentProgress;
       }
     }
-    console.timeEnd('Row processing');
-    // Broadcast progress to all connected clients
-   
     
-    // Add remaining bills
+    // Add the remaining bills
     if (currentCustomerBills.length > 0) {
       billRecords.push(...currentCustomerBills);
     }
     
-    // Fill in missing payment info and validate bills
-    console.log(`Processed ${billRecords.length} bills, preparing for database insertion`);
-    const validBillRecords = billRecords.filter(bill => {
-      // Fill in missing payment info if needed
+    // Before saving to the database, make sure all bills have their payment information
+    for (const bill of billRecords) {
+      // If a bill has zero for both cash and credit but has a total amount,
+      // check other bills in the same customer record for payment info
       if (bill.cash === 0 && bill.credit === 0 && bill.totalAmount > 0) {
-        bill.cash = bill.totalAmount; // Default to cash payment
-      }
-      
-      // Filter out bills without a bill number
-      return !!bill.billNo;
-    });
-    
-    console.log(`Found ${validBillRecords.length} valid bills to insert`);
-    
-    // Process store data first
-    console.time('Database operations');
-    const store = await executeWithRetry(async () => {
-      return prisma.store.upsert({
-        where: { storeName: storeInfo.name },
-        update: {
-          address: storeInfo.address,
-          phone: storeInfo.phone,
-          email: storeInfo.email
-        },
-        create: {
-          storeName: storeInfo.name,
-          address: storeInfo.address,
-          phone: storeInfo.phone,
-          email: storeInfo.email
-        },
-      });
-    });
-    
-    const storeId = store.id;
-    
-    // Process customers in bulk
-    const uniqueCustomers = new Map();
-    validBillRecords.forEach(bill => {
-      uniqueCustomers.set(bill.customerPhone, bill.customerName);
-    });
-    
-    // Create all customers at once
-    const customerData = Array.from(uniqueCustomers).map(([phone, name]) => ({
-      phone,
-      name,
-      address: null
-    }));
-    
-    // Create customers in smaller batches
-    const customerBatches = [];
-    for (let i = 0; i < customerData.length; i += BATCH_SIZE) {
-      customerBatches.push(customerData.slice(i, i + BATCH_SIZE));
-    }
-    
-    for (const batch of customerBatches) {
-      // Process customers sequentially in smaller sub-batches to avoid connection pool exhaustion
-      for (let i = 0; i < batch.length; i += 10) {
-        const subBatch = batch.slice(i, i + 10);
+        console.log(`Bill ${bill.billNo} is missing payment information. Attempting to recover.`);
         
-        await executeWithRetry(async () => {
-          // Use a transaction for the sub-batch
-          await prisma.$transaction(async (tx) => {
-            for (const customer of subBatch) {
-              const result = await tx.customer.upsert({
-                where: { phone: customer.phone },
-                update: { name: customer.name },
-                create: customer,
-              });
-              customerMap.set(customer.phone, result.id);
+        // Check if there's any row in the data that can help
+        for (let i = 0; i < data.length; i++) {
+          const row = data[i];
+          
+          // Skip rows that don't mention this bill
+          let containsBillNo = false;
+          for (const key in row) {
+            if (String(row[key]) === bill.billNo) {
+              containsBillNo = true;
+              break;
             }
-          });
-        });
-      }
-      
-      // Give connections time to be released
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-    
-    // Get existing bills to avoid duplicates
-    const existingBillNos = new Set(
-      (await executeWithRetry(async () => {
-        return prisma.bill.findMany({
-          where: {
-            billNo: {
-              in: validBillRecords.map(bill => bill.billNo)
-            }
-          },
-          select: { billNo: true }
-        });
-      })).map(bill => bill.billNo)
-    );
-    
-    // Filter out existing bills
-    const newBills = validBillRecords.filter(bill => !existingBillNos.has(bill.billNo));
-    console.log(`Processing ${newBills.length} new bills (${existingBillNos.size} already exist)`);
-    
-    // NEW CODE: Pre-calculate MRP for all bills before database insertion
-    // Group bills by bill number for proper MRP calculation
-    const billsGroupedByNumber = new Map();
-    for (const bill of newBills) {
-      billsGroupedByNumber.set(bill.billNo, bill);
-    }
-    
-    // Calculate proper MRP for each bill's items
-    for (const bill of billsGroupedByNumber.values()) {
-      const totalBillAmount = bill.totalAmount;
-      const totalQuantity = bill.items.reduce((sum, item) => sum + item.quantity, 0);
-      
-      // Only calculate if we have valid quantities and amount
-      if (totalQuantity > 0 && totalBillAmount > 0) {
-        const mrpPerUnit = totalBillAmount / totalQuantity;
-        
-        // Apply the calculated MRP to each item
-        for (const item of bill.items) {
-          if (item.mrp === 0) {
-            item.mrp = mrpPerUnit;
           }
+          
+          if (containsBillNo) {
+            // Look at the last two columns which are typically CASH and CREDIT
+            const columns = Object.keys(row);
+            if (columns.length >= 2) {
+              const cashColumn = columns[columns.length - 2];
+              const creditColumn = columns[columns.length - 1];
+              
+              if (row[cashColumn] && !isNaN(parseFloat(row[cashColumn]))) {
+                bill.cash = parseFloat(row[cashColumn]);
+              }
+              
+              if (row[creditColumn] && !isNaN(parseFloat(row[creditColumn]))) {
+                let creditValue = parseFloat(row[creditColumn]);
+                bill.credit = creditValue < 0 ? Math.abs(creditValue) : creditValue;
+              }
+              
+              console.log(`Recovered payment info for bill ${bill.billNo}: Cash=${bill.cash}, Credit=${bill.credit}`);
+              break;
+            }
+          }
+        }
+        
+        // If still no payment info, as a fallback, assume cash payment equal to total
+        if (bill.cash === 0 && bill.credit === 0) {
+          bill.cash = bill.totalAmount;
+          console.log(`Defaulted bill ${bill.billNo} to cash payment of ${bill.totalAmount}`);
         }
       }
     }
     
-    // Process new bills in smaller batches
-    const billBatches = [];
-    for (let i = 0; i < newBills.length; i += BATCH_SIZE) {
-      billBatches.push(newBills.slice(i, i + BATCH_SIZE));
-    }
+    console.log(`Extracted ${billRecords.length} bill records`);
     
-    let batchCount = 0;
-    for (const billBatch of billBatches) {
-      batchCount++;
-      console.log(`Processing batch ${batchCount} of ${billBatches.length}`);
-      
-      // Process bills sequentially within each batch
-      for (const bill of billBatch) {
-        try {
-          const customerId = customerMap.get(bill.customerPhone);
-          
-          if (!customerId) {
-            console.warn(`Missing customer ID for phone ${bill.customerPhone}, skipping bill ${bill.billNo}`);
-            continue;
-          }
-          
-          const netAmount = bill.totalAmount;
-          const amountPaid = bill.cash;
-          const creditAmount = bill.credit;
-          
-          await executeWithRetry(async () => {
-            return prisma.$transaction(async (tx) => {
-              // Create bill
-              const newBill = await tx.bill.create({
-                data: {
-                  billNo: bill.billNo,
-                  customerId: customerId,
-                  storeId: storeId,
-                  date: bill.date,
-                  netDiscount: 0,
-                  netAmount: netAmount,
-                  amountPaid: amountPaid,
-                  creditAmount: creditAmount,
-                  paymentType: creditAmount > 0 ? 'CREDIT' : 'CASH',
-                  isUploaded: true,
-                },
-              });
-              
-              // Prepare all bill details for bulk insert
-              const billDetails = [];
-              for (const item of bill.items) {
-                // MRP is already calculated above, use it directly
-                billDetails.push({
-                  billId: newBill.id,
-                  item: item.name,
-                  quantity: item.quantity,
-                  batch: item.batch || '',
-                  expBatch: item.expBatch || '',
-                  mrp: item.mrp,
-                  discount: 0,
-                });
-              }
-              
-              // Create bill details in smaller chunks to avoid timeouts
-              if (billDetails.length > 0) {
-                for (let i = 0; i < billDetails.length; i += 20) {
-                  const detailChunk = billDetails.slice(i, i + 20);
-                  await tx.billDetails.createMany({
-                    data: detailChunk,
-                    skipDuplicates: true,
-                  });
-                }
-              }
+    // Process batch by batch to insert into the database
+    for (const bill of billRecords) {
+      try {
+        // Skip bills without a bill number
+        if (!bill.billNo) {
+          console.log(`Skipping bill without bill number for customer ${bill.customerName}`);
+          continue;
+        }
+    
+        // Get or create customer
+        let customerId = customerMap.get(bill.customerPhone);
+        if (!customerId) {
+          const customer = await prisma.customer.upsert({
+            where: { phone: bill.customerPhone },
+            update: { name: bill.customerName },
+            create: {
+              name: bill.customerName,
+              phone: bill.customerPhone,
+              address: null,
+            },
+          });
+    
+          customerId = customer.id;
+          customerMap.set(bill.customerPhone, customerId);
+          console.log(`Created/found customer ${bill.customerName} with ID ${customerId}`);
+        }
+    
+        // Get or create store
+        let storeId = storeMap.get(storeName);
+        if (!storeId) {
+          const store = await prisma.store.upsert({
+            where: { storeName: storeName },
+            update: {
+              address: storeAddress,
+              phone: storePhone,
+              email: storeEmail
+            },
+            create: {
+              storeName: storeName,
+              address: storeAddress,
+              phone: storePhone,
+              email: storeEmail
+            },
+          });
+    
+          storeId = store.id;
+          storeMap.set(storeName, storeId);
+          console.log(`Created/found store ${storeName} with ID ${storeId}`);
+        }
+    
+        // Check if bill already exists to avoid duplicates
+        const existingBill = await prisma.bill.findUnique({
+          where: { billNo: bill.billNo },
+        });
+    
+        if (existingBill) {
+          console.log(`Bill ${bill.billNo} already exists, skipping`);
+          billMap.set(bill.billNo, existingBill.id);
+          continue; // Skip to next bill
+        }
+    
+        // Use the actual values from the bill
+        const netAmount = bill.totalAmount; // Total amount of the bill
+        const amountPaid = bill.cash; // Cash value
+        const creditAmount = bill.credit; // Credit value
+    
+        // Create bill and its details in a transaction
+        const result = await prisma.$transaction(async (tx) => {
+          const newBill = await tx.bill.create({
+            data: {
+              billNo: bill.billNo,
+              customerId: customerId,
+              storeId: storeId,
+              date: bill.date,
+              netDiscount: 0,
+              netAmount: netAmount,
+              amountPaid: amountPaid,
+              creditAmount: creditAmount,
+              paymentType: creditAmount > 0 ? 'CREDIT' : 'CASH',
+              isUploaded: true,
+            },
+          });
+    
+          console.log(`Created bill ${bill.billNo} with ID ${newBill.id}`);
+    
+          // Create bill details
+          for (const item of bill.items) {
+            // Calculate the MRP per item if no specific MRP is found
+            let itemMrp = item.mrp;
+            if (itemMrp === 0 && bill.items.length > 0) {
+              itemMrp = netAmount / bill.items.length; // Simple average if no specific MRP
+            }
+            
+            const billDetail = await tx.billDetails.create({
+              data: {
+                billId: newBill.id,
+                item: item.name,
+                quantity: item.quantity,
+                batch: item.batch || '',
+                expBatch: item.expBatch || '',
+                mrp: itemMrp,
+                discount: 0,
+              },
             });
-          });
-          
-          totalBills++;
-          totalItems += bill.items.length;
-        } catch (error) {
-          console.error(`Error processing bill ${bill.billNo}:`, error.message);
-        }
+    
+            console.log(`Created bill detail for ${item.name} with ID ${billDetail.id}`);
+            totalItems++;
+          }
+    
+          return newBill;
+        });
+    
+        billMap.set(bill.billNo, result.id);
+        totalBills++;
+    
+        console.log(`Successfully processed bill ${bill.billNo}`);
+      } catch (error) {
+        console.error(`Error processing bill ${bill.billNo}:`, error);
       }
-      
-      // Update progress after each batch
-      const processingProgress = (batchCount / billBatches.length) * 100;
-      parentPort.postMessage({
-        status: 'progress', 
-        progress: 90 + (processingProgress * 0.1) // 90-100% for DB operations
-      });
-      // Final completion message
-     
-      
-      // Give connections time to be released between batches
-      await prisma.$disconnect();
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      await prisma.$connect();
     }
-    console.timeEnd('Database operations');
     
-    const endTime = Date.now();
-    const processingTimeSeconds = ((endTime - startTime) / 1000).toFixed(2);
-    
-    console.log(`Processing completed in ${processingTimeSeconds} seconds`);
-    console.log(`Bills created: ${totalBills}, Items created: ${totalItems}`);
+    console.log('Completed processing all bills');
     
     parentPort.postMessage({
       status: 'completed',
@@ -714,15 +729,11 @@ async function processExcelFile() {
         totalProcessed: processedRows,
         billsExtracted: billRecords.length,
         billsCreated: totalBills,
-        itemsCreated: totalItems,
-        processingTimeSeconds: processingTimeSeconds
+        itemsCreated: totalItems
       }
     });
     
-    // Clean up resources
-    if (fs.existsSync(tempFilePath)) {
-      fs.unlinkSync(tempFilePath);
-    }
+    // Clean up
     await prisma.$disconnect();
   } catch (error) {
     console.error('Worker error:', error);
@@ -731,15 +742,7 @@ async function processExcelFile() {
       error: error.message 
     });
     
-    // Clean up
-    try {
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
-      }
-      await prisma.$disconnect();
-    } catch (cleanupError) {
-      console.error('Error during cleanup:', cleanupError);
-    }
+    await prisma.$disconnect();
   }
 }
 

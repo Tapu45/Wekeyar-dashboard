@@ -9,17 +9,11 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const routes_1 = __importDefault(require("./routes/routes"));
 const upload_route_1 = __importDefault(require("./routes/upload.route"));
-const path_1 = __importDefault(require("path"));
-const fs_1 = __importDefault(require("fs"));
 const http_1 = __importDefault(require("http"));
 const Websocket_1 = require("./utils/Websocket");
 const client_1 = require("@prisma/client");
 const app = (0, express_1.default)();
 const prisma = new client_1.PrismaClient();
-const uploadsDir = path_1.default.join(__dirname, "../uploads");
-if (!fs_1.default.existsSync(uploadsDir)) {
-    fs_1.default.mkdirSync(uploadsDir, { recursive: true });
-}
 app.use(express_1.default.json());
 app.use((0, cookie_parser_1.default)());
 app.use((0, cors_1.default)({ origin: "*" }));

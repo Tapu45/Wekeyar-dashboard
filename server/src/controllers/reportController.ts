@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import { SummaryReport, NonBuyingCustomer, MonthlyNonBuyingCustomer } from "src/types/types";
+import { NonBuyingCustomer, MonthlyNonBuyingCustomer } from "src/types/types";
 import { subDays, subWeeks, subMonths } from "date-fns";
 
 export const prisma = new PrismaClient();
@@ -8,41 +8,67 @@ export const prisma = new PrismaClient();
 /**
  * 1. Summary Report
  */
-export const getSummary = async (_req: Request, res: Response) => {
+export const getSummary = async (req: Request, res: Response) => {
   try {
+    const { fromDate, toDate, storeId } = req.query;
+
+    const startDate = fromDate ? new Date(fromDate as string) : new Date();
+    const endDate = toDate ? new Date(toDate as string) : new Date();
+
+    // Total customers count
     const totalCustomers = await prisma.customer.count();
+
+    // Total revenue
     const totalRevenueData = await prisma.bill.aggregate({
       _sum: { netAmount: true },
-    });
-
-    const currentDate = new Date();
-    const lastMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
-
-    console.log("Last Month Start:", lastMonthStart);
-    console.log("Last Month End:", lastMonthEnd);
-
-    // Fetch active customers
-    const activeCustomersList = await prisma.customer.findMany({
-      where: { bills: { some: { date: { gte: lastMonthStart, lte: lastMonthEnd } } } },
-      select: {
-        id: true,
-        name: true,
-        phone: true,
+      where: {
+        date: {
+          gte: startDate,
+          lte: endDate,
+        },
+        ...(storeId ? { storeId: Number(storeId) } : {}),
       },
     });
 
-    console.log("Active Customers Count:", activeCustomersList.length);
-    console.log("Active Customers Details:", activeCustomersList);
+    // Fetch customers with transactions
+    const activeCustomers = await prisma.customer.findMany({
+      where: {
+        bills: {
+          some: {
+            date: {
+              gte: startDate,
+              lte: endDate,
+            },
+            ...(storeId ? { storeId: Number(storeId) } : {}),
+          },
+        },
+      },
+      include: {
+        bills: {
+          where: {
+            date: {
+              gte: startDate,
+              lte: endDate,
+            },
+          },
+        },
+      },
+    });
 
-    const inactiveCustomers = totalCustomers - activeCustomersList.length;
+    // Filter active customers (repeat buyers)
+    const repeatBuyers = activeCustomers.filter(
+      (customer) => customer.bills.length > 1
+    );
+    const inactiveCustomers = totalCustomers - repeatBuyers.length;
+
+    // Calculate average monthly revenue
     const avgMonthlyRevenue = totalRevenueData._sum.netAmount
       ? totalRevenueData._sum.netAmount / 12
       : 0;
 
-    const summary: SummaryReport = {
+    const summary = {
       totalCustomers,
-      activeCustomers: activeCustomersList.length,
+      activeCustomers: repeatBuyers.length,
       inactiveCustomers,
       totalRevenue: totalRevenueData._sum.netAmount || 0,
       avgMonthlyRevenue,
@@ -51,7 +77,7 @@ export const getSummary = async (_req: Request, res: Response) => {
     res.json(summary);
   } catch (error) {
     console.error("Error in getSummary:", error);
-    res.status(500).json({ error: "Internal server error", details: error });
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -91,7 +117,10 @@ export const getNonBuyingCustomers = async (req: Request, res: Response) => {
       name: customer.name,
       phone: customer.phone,
       lastPurchaseDate: customer.bills.length ? customer.bills[0].date : null,
-      totalPurchaseValue: customer.bills.reduce((acc, bill) => acc + bill.netAmount, 0),
+      totalPurchaseValue: customer.bills.reduce(
+        (acc, bill) => acc + bill.netAmount,
+        0
+      ),
     }));
 
     res.json(result);
@@ -103,10 +132,17 @@ export const getNonBuyingCustomers = async (req: Request, res: Response) => {
 /**
  * 3. Non-Buying Customer List (Monthly Buyers)
  */
-export const getNonBuyingMonthlyCustomers = async (_req: Request, res: Response) => {
+export const getNonBuyingMonthlyCustomers = async (
+  _req: Request,
+  res: Response
+) => {
   try {
     const currentDate = new Date();
-    const currentMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const currentMonthStart = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1
+    );
 
     const customers = await prisma.customer.findMany({
       where: {
@@ -126,9 +162,14 @@ export const getNonBuyingMonthlyCustomers = async (_req: Request, res: Response)
     });
 
     const result: MonthlyNonBuyingCustomer[] = customers.map((customer) => {
-      const totalAmount = customer.bills.reduce((acc, bill) => acc + bill.netAmount, 0);
+      const totalAmount = customer.bills.reduce(
+        (acc, bill) => acc + bill.netAmount,
+        0
+      );
       const monthsCount = new Set(
-        customer.bills.map((bill) => `${bill.date.getFullYear()}-${bill.date.getMonth()}`)
+        customer.bills.map(
+          (bill) => `${bill.date.getFullYear()}-${bill.date.getMonth()}`
+        )
       ).size;
 
       return {
@@ -146,11 +187,13 @@ export const getNonBuyingMonthlyCustomers = async (_req: Request, res: Response)
   }
 };
 
-
 /**
  * 4. Customer Purchase History
  */
-export const getCustomerReport = async (req: Request, res: Response): Promise<void> => {
+export const getCustomerReport = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { startDate, endDate, storeId, search } = req.query;
 
@@ -173,8 +216,16 @@ export const getCustomerReport = async (req: Request, res: Response): Promise<vo
 
     if (search) {
       whereCondition.OR = [
-        { customer: { name: { contains: search as string, mode: "insensitive" } } },
-        { customer: { phone: { contains: search as string, mode: "insensitive" } } },
+        {
+          customer: {
+            name: { contains: search as string, mode: "insensitive" },
+          },
+        },
+        {
+          customer: {
+            phone: { contains: search as string, mode: "insensitive" },
+          },
+        },
       ];
     }
 
@@ -207,7 +258,10 @@ export const getCustomerReport = async (req: Request, res: Response): Promise<vo
 
       // Update total sales and product quantity
       customerEntry.totalSales += bill.netAmount;
-      customerEntry.totalProducts += bill.billDetails.reduce((sum, detail) => sum + detail.quantity, 0);
+      customerEntry.totalProducts += bill.billDetails.reduce(
+        (sum, detail) => sum + detail.quantity,
+        0
+      );
 
       // Add bill details
       customerEntry.bills.push({
@@ -233,7 +287,10 @@ export const getCustomerReport = async (req: Request, res: Response): Promise<vo
 /**
  * 5. Store-wise Sales Report
  */
-export const getStoreWiseSalesReport = async (req: Request, res: Response): Promise<void> => {
+export const getStoreWiseSalesReport = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { date } = req.query;
     const selectedDate = date ? new Date(date as string) : new Date(); // Default to today
@@ -269,13 +326,19 @@ export const getStoreWiseSalesReport = async (req: Request, res: Response): Prom
       return {
         totalNetAmount: sales.reduce((sum, bill) => sum + bill.netAmount, 0),
         totalBills: sales.length,
-        totalItemsSold: sales.reduce((sum, bill) => sum + bill.billDetails.length, 0),
+        totalItemsSold: sales.reduce(
+          (sum, bill) => sum + bill.billDetails.length,
+          0
+        ),
         isUploaded: sales.length > 0 ? sales[0].isUploaded : false,
       };
     };
 
     // Function to find the latest available sales before a given date
-    const fetchLatestAvailableSales = async (storeId: number, referenceDate: Date) => {
+    const fetchLatestAvailableSales = async (
+      storeId: number,
+      referenceDate: Date
+    ) => {
       const latestBill = await prisma.bill.findFirst({
         where: {
           storeId,
@@ -301,9 +364,18 @@ export const getStoreWiseSalesReport = async (req: Request, res: Response): Prom
     const storeReports = await Promise.all(
       stores.map(async (store) => {
         const currentSales = await fetchSalesData(store.id, selectedDate);
-        const previousDaySales = await fetchLatestAvailableSales(store.id, previousDay);
-        const previousWeekSales = await fetchLatestAvailableSales(store.id, previousWeek);
-        const previousMonthSales = await fetchLatestAvailableSales(store.id, previousMonth);
+        const previousDaySales = await fetchLatestAvailableSales(
+          store.id,
+          previousDay
+        );
+        const previousWeekSales = await fetchLatestAvailableSales(
+          store.id,
+          previousWeek
+        );
+        const previousMonthSales = await fetchLatestAvailableSales(
+          store.id,
+          previousMonth
+        );
 
         return {
           storeName: store.storeName,
@@ -333,11 +405,25 @@ export const getStoreWiseSalesReport = async (req: Request, res: Response): Prom
   }
 };
 
-export const getAllCustomers = async (_req: Request, res: Response): Promise<void> => {
+export const getAllCustomers = async (
+  _req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const currentDate = new Date();
-    const lastMonthStart = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() - 1, 1));
-    const lastMonthEnd = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth(), 0, 23, 59, 59));
+    const lastMonthStart = new Date(
+      Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() - 1, 1)
+    );
+    const lastMonthEnd = new Date(
+      Date.UTC(
+        currentDate.getUTCFullYear(),
+        currentDate.getUTCMonth(),
+        0,
+        23,
+        59,
+        59
+      )
+    );
 
     console.log("Last Month Start (UTC):", lastMonthStart.toISOString());
     console.log("Last Month End (UTC):", lastMonthEnd.toISOString());
@@ -360,10 +446,18 @@ export const getAllCustomers = async (_req: Request, res: Response): Promise<voi
 
     // Process each customer to determine active/inactive status
     const result = customers.map((customer) => {
-      const lastPurchaseDate = customer.bills.length ? new Date(customer.bills[0].date) : null;
+      const lastPurchaseDate = customer.bills.length
+        ? new Date(customer.bills[0].date)
+        : null;
 
-      console.log(`Customer: ${customer.name}, Last Purchase (Raw):`, customer.bills[0]?.date);
-      console.log(`Customer: ${customer.name}, Last Purchase (Parsed):`, lastPurchaseDate?.toISOString());
+      console.log(
+        `Customer: ${customer.name}, Last Purchase (Raw):`,
+        customer.bills[0]?.date
+      );
+      console.log(
+        `Customer: ${customer.name}, Last Purchase (Parsed):`,
+        lastPurchaseDate?.toISOString()
+      );
 
       let isActive = false;
       if (lastPurchaseDate) {
@@ -372,7 +466,11 @@ export const getAllCustomers = async (_req: Request, res: Response): Promise<voi
           lastPurchaseDate.getTime() <= lastMonthEnd.getTime();
       }
 
-      console.log(`Customer: ${customer.name}, Status: ${isActive ? "Active" : "Inactive"}`);
+      console.log(
+        `Customer: ${customer.name}, Status: ${
+          isActive ? "Active" : "Inactive"
+        }`
+      );
 
       return {
         name: customer.name,
@@ -388,8 +486,6 @@ export const getAllCustomers = async (_req: Request, res: Response): Promise<voi
     res.status(500).json({ error: "Internal server error" });
   }
 };
-
-
 
 /**
  * Get yearly revenue data for the last 5 years
@@ -440,43 +536,54 @@ export const getMonthlyRevenue = async (req: Request, res: Response) => {
   try {
     const { year } = req.params;
     const selectedYear = parseInt(year) || new Date().getFullYear();
-    
+
     // Generate all months of the year
     const months = Array.from({ length: 12 }, (_, i) => i + 1);
-    
+
     const monthlyRevenue = await Promise.all(
       months.map(async (month) => {
         // Create date range for the month
-        const startDate = new Date(`${selectedYear}-${month.toString().padStart(2, '0')}-01T00:00:00.000Z`);
-        
+        const startDate = new Date(
+          `${selectedYear}-${month
+            .toString()
+            .padStart(2, "0")}-01T00:00:00.000Z`
+        );
+
         // Calculate the last day of the month
         const lastDay = new Date(selectedYear, month, 0).getDate();
-        const endDate = new Date(`${selectedYear}-${month.toString().padStart(2, '0')}-${lastDay}T23:59:59.999Z`);
-        
+        const endDate = new Date(
+          `${selectedYear}-${month
+            .toString()
+            .padStart(2, "0")}-${lastDay}T23:59:59.999Z`
+        );
+
         const revenue = await prisma.bill.aggregate({
           _sum: {
-            netAmount: true
+            netAmount: true,
           },
           where: {
             date: {
               gte: startDate,
-              lte: endDate
-            }
-          }
+              lte: endDate,
+            },
+          },
         });
-        
+
         return {
           month,
-          monthName: new Date(selectedYear, month - 1, 1).toLocaleString('default', { month: 'short' }),
-          revenue: revenue._sum.netAmount || 0
+          monthName: new Date(selectedYear, month - 1, 1).toLocaleString(
+            "default",
+            { month: "short" }
+          ),
+          revenue: revenue._sum.netAmount || 0,
         };
       })
     );
-    
+
     res.status(200).json(monthlyRevenue);
   } catch (error) {
-    console.error('Error fetching monthly revenue:', error);
-    res.status(500).json({ error: 'Failed to fetch monthly revenue data' });
+    console.error("Error fetching monthly revenue:", error);
+    res.status(500).json({ error: "Failed to fetch monthly revenue data" });
   }
 };
 
@@ -487,12 +594,12 @@ export const getAvailableYears = async (_req: Request, res: Response) => {
   try {
     // Find the earliest and latest years in the database
     const earliestBill = await prisma.bill.findFirst({
-      orderBy: { date: 'asc' },
+      orderBy: { date: "asc" },
       select: { date: true },
     });
 
     const latestBill = await prisma.bill.findFirst({
-      orderBy: { date: 'desc' },
+      orderBy: { date: "desc" },
       select: { date: true },
     });
 
@@ -500,8 +607,12 @@ export const getAvailableYears = async (_req: Request, res: Response) => {
     const currentYear = new Date().getFullYear();
 
     // Determine the range of years
-    const earliestYear = earliestBill ? earliestBill.date.getFullYear() : currentYear;
-    const latestYear = latestBill ? Math.max(latestBill.date.getFullYear(), currentYear) : currentYear;
+    const earliestYear = earliestBill
+      ? earliestBill.date.getFullYear()
+      : currentYear;
+    const latestYear = latestBill
+      ? Math.max(latestBill.date.getFullYear(), currentYear)
+      : currentYear;
 
     // Generate the list of years
     const years = Array.from(
@@ -511,16 +622,7 @@ export const getAvailableYears = async (_req: Request, res: Response) => {
 
     res.status(200).json(years);
   } catch (error) {
-    console.error('Error fetching available years:', error);
-    res.status(500).json({ error: 'Failed to fetch available years' });
+    console.error("Error fetching available years:", error);
+    res.status(500).json({ error: "Failed to fetch available years" });
   }
 };
-
-
-
-
-
-
-
-
-

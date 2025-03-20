@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   XAxis,
@@ -19,7 +17,9 @@ const RevenueCharts: React.FC = () => {
   const [yearlyData, setYearlyData] = useState<YearlyRevenue[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyRevenue[]>([]);
   const [availableYears, setAvailableYears] = useState<AvailableYears>([]);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number>(
+    new Date().getFullYear()
+  );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,7 +27,9 @@ const RevenueCharts: React.FC = () => {
   useEffect(() => {
     const fetchAvailableYears = async () => {
       try {
-        const response = await api.get<AvailableYears>(API_ROUTES.AVAILABLE_YEARS);
+        const response = await api.get<AvailableYears>(
+          API_ROUTES.AVAILABLE_YEARS
+        );
         setAvailableYears(response.data);
 
         // If there are years available and no year is selected yet, select the most recent
@@ -48,7 +50,9 @@ const RevenueCharts: React.FC = () => {
     const fetchYearlyData = async () => {
       try {
         setLoading(true);
-        const response = await api.get<YearlyRevenue[]>(API_ROUTES.YEARLY_REVENUE);
+        const response = await api.get<YearlyRevenue[]>(
+          API_ROUTES.YEARLY_REVENUE
+        );
         setYearlyData(response.data);
         setError(null);
       } catch (err) {
@@ -69,13 +73,17 @@ const RevenueCharts: React.FC = () => {
 
       try {
         setLoading(true);
-        const response = await api.get<MonthlyRevenue[]>(`${API_ROUTES.MONTHLY_REVENUE}/${selectedYear}`);
+        const response = await api.get<MonthlyRevenue[]>(
+          `${API_ROUTES.MONTHLY_REVENUE}/${selectedYear}`
+        );
         console.log("Monthly Revenue Data:", response.data); // Log the response
         setMonthlyData(response.data);
         setError(null);
       } catch (err) {
         console.error("Error fetching monthly revenue data:", err);
-        setError("Failed to load monthly revenue data. Please try again later.");
+        setError(
+          "Failed to load monthly revenue data. Please try again later."
+        );
       } finally {
         setLoading(false);
       }
@@ -100,7 +108,11 @@ const RevenueCharts: React.FC = () => {
   };
 
   if (loading && !yearlyData.length && !monthlyData.length) {
-    return <div className="flex justify-center items-center h-64">Loading revenue data...</div>;
+    return (
+      <div className="flex justify-center items-center h-64">
+        Loading revenue data...
+      </div>
+    );
   }
 
   return (

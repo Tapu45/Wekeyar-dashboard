@@ -70,6 +70,7 @@ const RevenueCharts: React.FC = () => {
       try {
         setLoading(true);
         const response = await api.get<MonthlyRevenue[]>(`${API_ROUTES.MONTHLY_REVENUE}/${selectedYear}`);
+        console.log("Monthly Revenue Data:", response.data); // Log the response
         setMonthlyData(response.data);
         setError(null);
       } catch (err) {
@@ -109,34 +110,6 @@ const RevenueCharts: React.FC = () => {
           {error}
         </div>
       )}
-
-      {/* Yearly Revenue Chart */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-semibold mb-4">Revenue Over Last 5 Years</h2>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={yearlyData}
-              margin={{ top: 10, right: 30, left: 20, bottom: 30 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="year" />
-              <YAxis tickFormatter={formatCurrency} width={80} />
-              <Tooltip formatter={(value) => formatCurrency(value as number)} />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="revenue"
-                name="Revenue"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                dot={{ r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
 
       {/* Monthly Revenue Chart with Year Filter */}
       <div className="bg-white p-6 rounded-lg shadow-md">

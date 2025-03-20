@@ -4,8 +4,8 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./routes/authRoutes";
 import routes from "./routes/routes";
 import uploadRoutes from "./routes/upload.route";
-import path from "path";
-import fs from "fs";
+// import path from "path";
+// import fs from "fs";
 import http from "http"; // Import HTTP module
 import { initializeWebSocketServer } from "./utils/Websocket"; // Import WebSocket server
 import { PrismaClient } from "@prisma/client"; // Import PrismaClient
@@ -14,10 +14,10 @@ const app = express();
 const prisma = new PrismaClient();
 
 // Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, "../uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+// const uploadsDir = path.join(__dirname, "../uploads");
+// if (!fs.existsSync(uploadsDir)) {
+//   fs.mkdirSync(uploadsDir, { recursive: true });
+// }
 
 app.use(express.json()); // To parse JSON request bodies
 app.use(cookieParser()); // To parse cookies

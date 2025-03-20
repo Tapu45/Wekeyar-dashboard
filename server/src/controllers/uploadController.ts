@@ -6,6 +6,7 @@ import fs from 'fs';
 import { Worker } from 'worker_threads';
 import path from 'path';
 import { broadcastProgress, broadcastCompletion } from "../utils/Websocket"; 
+import cloudinary from '../utils/cloudinary';
 
 const prisma = new PrismaClient();
 
@@ -36,14 +37,26 @@ export const uploadExcelFile = async (req: Request, res: Response): Promise<void
     const filePath = req.file.path;
     const fileName = req.file.originalname;
 
+      // Upload the file to Cloudinary
+      console.log(`Uploading file to Cloudinary: ${filePath}`);
+      const cloudinaryResult = await cloudinary.uploader.upload(filePath, {
+        folder: "uploads", // Specify the folder in Cloudinary
+        resource_type: "raw", // Use "raw" for non-image files like Excel
+      });
+  
+      console.log("File uploaded to Cloudinary:", cloudinaryResult.secure_url);
+
+      fs.unlinkSync(filePath);
+
     // Create an entry in the UploadHistory table with "in-progress" status
     const uploadHistory = await prisma.uploadHistory.create({
       data: {
         fileName,
+        fileUrl: cloudinaryResult.secure_url,
         status: "in-progress",
       },
     });
-
+  
     const workerPath = path.resolve(__dirname, "./excelProccessor.js");
     if (!fs.existsSync(workerPath)) {
       console.error(`Worker file does not exist at: ${workerPath}`);
@@ -59,7 +72,7 @@ export const uploadExcelFile = async (req: Request, res: Response): Promise<void
     }
 
     const worker = new Worker(workerPath, {
-      workerData: { filePath },
+      workerData: { fileUrl: cloudinaryResult.secure_url }, // Pass the Cloudinary URL
     });
 
     worker.on("message", async (message) => {

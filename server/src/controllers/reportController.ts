@@ -152,7 +152,7 @@ export const getNonBuyingMonthlyCustomers = async (_req: Request, res: Response)
  */
 export const getCustomerReport = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { startDate, endDate, storeId } = req.query;
+    const { startDate, endDate, storeId, search } = req.query;
 
     // Convert query params to proper types
     const start = startDate ? new Date(startDate as string) : undefined;
@@ -163,7 +163,7 @@ export const getCustomerReport = async (req: Request, res: Response): Promise<vo
     if (start && end) {
       whereCondition.date = {
         gte: start,
-        lte: end, 
+        lte: end,
       };
     }
 
@@ -171,12 +171,19 @@ export const getCustomerReport = async (req: Request, res: Response): Promise<vo
       whereCondition.storeId = Number(storeId);
     }
 
+    if (search) {
+      whereCondition.OR = [
+        { customer: { name: { contains: search as string, mode: "insensitive" } } },
+        { customer: { phone: { contains: search as string, mode: "insensitive" } } },
+      ];
+    }
+
     // Fetch all relevant bills
     const bills = await prisma.bill.findMany({
       where: whereCondition,
       include: {
         customer: true,
-        store: true,
+        billDetails: true, // Include medicine details
       },
     });
 
@@ -185,51 +192,41 @@ export const getCustomerReport = async (req: Request, res: Response): Promise<vo
 
     bills.forEach((bill) => {
       const { id, name, phone } = bill.customer;
-      const storeName = bill.store.storeName;
 
       if (!customerData.has(id)) {
         customerData.set(id, {
           customerName: name,
           mobileNo: phone,
           totalSales: 0,
-          purchaseFrequency: 0, // Fix: Count each bill separately
-          stores: new Map(),
+          totalProducts: 0, // Total quantity of products
+          bills: [],
         });
       }
 
       const customerEntry = customerData.get(id);
 
-      // Update total sales
+      // Update total sales and product quantity
       customerEntry.totalSales += bill.netAmount;
+      customerEntry.totalProducts += bill.billDetails.reduce((sum, detail) => sum + detail.quantity, 0);
 
-      // Fix: Increment purchase frequency per bill, not per store
-      customerEntry.purchaseFrequency += 1;
-
-      // Track sales per store
-      if (!customerEntry.stores.has(storeName)) {
-        customerEntry.stores.set(storeName, 0);
-      }
-      customerEntry.stores.set(storeName, customerEntry.stores.get(storeName) + bill.netAmount);
+      // Add bill details
+      customerEntry.bills.push({
+        billNo: bill.billNo,
+        date: bill.date,
+        medicines: bill.billDetails.map((detail) => ({
+          name: detail.item,
+          quantity: detail.quantity,
+        })),
+      });
     });
 
     // Convert Map to JSON-friendly format
-    const result = Array.from(customerData.values()).map((entry) => ({
-      customerName: entry.customerName,
-      mobileNo: entry.mobileNo,
-      totalSales: entry.totalSales,
-      purchaseFrequency: entry.purchaseFrequency, // Fix: Now counts every bill correctly
-      stores: Array.from(entry.stores.entries() as [string, number][]).map(([storeName, sales]) => ({
-        storeName,
-        sales,
-      })),
-    }));
+    const result = Array.from(customerData.values());
 
-   res.json(result);
-   return;
+    res.json(result);
   } catch (error) {
     console.error("Error fetching customer report:", error);
-   res.status(500).json({ error: "Internal server error" });
-    return;
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -488,31 +485,25 @@ export const getMonthlyRevenue = async (req: Request, res: Response) => {
  */
 export const getAvailableYears = async (_req: Request, res: Response) => {
   try {
-    // Find earliest and latest years in the database
+    // Find the earliest and latest years in the database
     const earliestBill = await prisma.bill.findFirst({
-      orderBy: {
-        date: 'asc',
-      },
-      select: {
-        date: true,
-      },
+      orderBy: { date: 'asc' },
+      select: { date: true },
     });
 
     const latestBill = await prisma.bill.findFirst({
-      orderBy: {
-        date: 'desc',
-      },
-      select: {
-        date: true,
-      },
+      orderBy: { date: 'desc' },
+      select: { date: true },
     });
 
-    // Default to current year if no data
+    // Get the current year
     const currentYear = new Date().getFullYear();
-    const earliestYear = earliestBill ? earliestBill.date.getFullYear() : currentYear;
-    const latestYear = latestBill ? latestBill.date.getFullYear() : currentYear;
 
-    // Generate array of available years
+    // Determine the range of years
+    const earliestYear = earliestBill ? earliestBill.date.getFullYear() : currentYear;
+    const latestYear = latestBill ? Math.max(latestBill.date.getFullYear(), currentYear) : currentYear;
+
+    // Generate the list of years
     const years = Array.from(
       { length: latestYear - earliestYear + 1 },
       (_, i) => earliestYear + i

@@ -31,7 +31,7 @@ const Sidebar: React.FC<{
     { title: "Monthly Non-Buying", path: "/non-buying-monthly-customers", icon: ClipboardList },
     { title: "Customer Report", path: "/customer-report", icon: BarChart3 },
     { title: "Store Sales Report", path: "/store-sales-report", icon: Store },
-    { title: "upload", path: "/upload", icon: UploadCloud },
+    { title: "Upload", path: "/upload", icon: UploadCloud },
   ];
 
   const isActivePath = (path: string) => location.pathname === path;
@@ -124,7 +124,7 @@ const Sidebar: React.FC<{
 
         {/* Footer */}
         <div className="p-4 border-t border-blue-500 text-white text-center text-sm opacity-70">
-          {isExpanded && <p>© 2025 Dashboard</p>}
+          {isExpanded && <p>© 2025 <br /> Created By Nexus Infotech.</p>}
         </div>
       </aside>
     </>

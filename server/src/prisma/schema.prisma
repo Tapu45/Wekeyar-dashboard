@@ -65,6 +65,7 @@ model UploadHistory {
   id         Int      @id @default(autoincrement())
   fileName   String
   uploadDate DateTime @default(now())
+  fileUrl    String?
   status     String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

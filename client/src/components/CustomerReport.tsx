@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api, { API_ROUTES } from "../utils/api";
-import { CustomerReportData } from "../utils/types";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { CustomerReportData, MedicineDetails } from "../utils/types";
+import { ChevronDown, ChevronUp, Calendar, Search, ShoppingBag, CreditCard, User, Phone, Receipt, Clock } from "lucide-react";
 
-const fetchCustomerReport = async (startDate: string, endDate: string, storeId?: number) => {
-  const { data } = await api.get<CustomerReportData[]>(API_ROUTES.CUSTOMER_REPORT, {
-    params: { startDate, endDate, storeId },
+const fetchCustomerReport = async (startDate: string, endDate: string, search?: string): Promise<CustomerReportData[]> => {
+  const { data } = await api.get(API_ROUTES.CUSTOMER_REPORT, {
+    params: { startDate, endDate, search },
   });
   return data;
 };
@@ -14,13 +15,12 @@ const fetchCustomerReport = async (startDate: string, endDate: string, storeId?:
 const CustomerReportPage: React.FC = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [storeId, setStoreId] = useState<number | undefined>(undefined);
-  const [visibleItems, setVisibleItems] = useState(5);
-  const [viewMode, setViewMode] = useState<"card" | "table">("card");
+  const [search, setSearch] = useState("");
+  const [expandedCustomer, setExpandedCustomer] = useState<number | null>(null);
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["customerReport", startDate, endDate, storeId],
-    queryFn: () => fetchCustomerReport(startDate, endDate, storeId),
+  const { data, isLoading, error, refetch } = useQuery<CustomerReportData[]>({
+    queryKey: ["customerReport", startDate, endDate, search],
+    queryFn: () => fetchCustomerReport(startDate, endDate, search),
     enabled: false,
   });
 
@@ -28,18 +28,11 @@ const CustomerReportPage: React.FC = () => {
     if (startDate && endDate) {
       refetch();
     }
-  }, [startDate, endDate, storeId, refetch]);
+  }, [startDate, endDate, search, refetch]);
 
-  const showMore = () => {
-    setVisibleItems((prev) => Math.min(prev + 5, data?.length || 0));
+  const toggleExpand = (customerIndex: number) => {
+    setExpandedCustomer((prev) => (prev === customerIndex ? null : customerIndex));
   };
-
-  const showLess = () => {
-    setVisibleItems(5);
-  };
-
-  const visibleData = data?.slice(0, visibleItems) || [];
-  const hasMoreToShow = data && visibleItems < data.length;
 
   return (
     <motion.div
@@ -48,229 +41,213 @@ const CustomerReportPage: React.FC = () => {
       transition={{ duration: 0.5 }}
       className="bg-white rounded-xl shadow-xl overflow-hidden"
     >
-      <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-800">
-        <h2 className="text-2xl font-bold text-white">Customer Report</h2>
-        <p className="text-blue-100">View customer purchase history and details</p>
+      <div className="p-6 bg-gradient-to-r from-blue-700 to-indigo-800">
+        <div className="flex items-center space-x-3">
+          <ShoppingBag size={28} className="text-white" />
+          <div>
+            <h2 className="text-2xl font-bold text-white">Customer Report</h2>
+            <p className="text-blue-100">View detailed customer purchase analytics</p>
+          </div>
+        </div>
       </div>
 
       <div className="p-6">
-        <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="flex flex-col gap-2">
-            <label className="font-medium text-gray-700">Start Date</label>
+            <label className="font-medium text-gray-700 flex items-center gap-2">
+              <Calendar size={18} className="text-blue-600" />
+              <span>Start Date</span>
+            </label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-500 outline-none"
+              className="p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-500 outline-none transition-all duration-200"
             />
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="font-medium text-gray-700">End Date</label>
+            <label className="font-medium text-gray-700 flex items-center gap-2">
+              <Calendar size={18} className="text-blue-600" />
+              <span>End Date</span>
+            </label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-500 outline-none"
+              className="p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-500 outline-none transition-all duration-200"
             />
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="font-medium text-gray-700">Store ID</label>
+            <label className="font-medium text-gray-700 flex items-center gap-2">
+              <Search size={18} className="text-blue-600" />
+              <span>Search (Mobile No or Name)</span>
+            </label>
             <input
-              type="number"
-              placeholder="Enter Store ID"
-              value={storeId || ""}
-              onChange={(e) => setStoreId(e.target.value ? Number(e.target.value) : undefined)}
-              className="p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-500 outline-none"
+              type="text"
+              placeholder="Enter Mobile No or Name"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-500 outline-none transition-all duration-200"
             />
           </div>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-              <p className="text-blue-600 font-medium">Loading report...</p>
+            <div className="flex space-x-2">
+              {[...Array(3)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  animate={{
+                    scale: [1, 1.5, 1],
+                    opacity: [0.3, 1, 0.3]
+                  }}
+                  transition={{
+                    duration: 1,
+                    repeat: Infinity,
+                    delay: i * 0.2
+                  }}
+                  className="w-4 h-4 bg-blue-600 rounded-full"
+                />
+              ))}
             </div>
           </div>
         ) : error ? (
-          <div className="p-8 text-red-600 bg-red-50 border border-red-200 rounded-lg shadow-lg">
-            <p className="text-lg font-semibold">Error fetching report. Please try again.</p>
-          </div>
-        ) : data && data.length > 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="space-y-6"
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="p-8 text-red-600 bg-red-50 border border-red-200 rounded-lg shadow-lg"
           >
-            <div className="flex justify-between items-center bg-blue-50 p-4 rounded-lg mb-6">
-              <p className="text-blue-800 font-medium">Showing {visibleItems} of {data.length} customers</p>
-              
-              <div className="flex border border-blue-300 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setViewMode("card")}
-                  className={`px-4 py-2 flex items-center ${viewMode === "card" 
-                    ? "bg-blue-600 text-white" 
-                    : "bg-white text-blue-700 hover:bg-blue-50"}`}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  </svg>
-                  Card View
-                </button>
-                <button
-                  onClick={() => setViewMode("table")}
-                  className={`px-4 py-2 flex items-center ${viewMode === "table" 
-                    ? "bg-blue-600 text-white" 
-                    : "bg-white text-blue-700 hover:bg-blue-50"}`}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  Table View
-                </button>
-              </div>
-            </div>
-            
-            {viewMode === "card" ? (
-              <div className="grid grid-cols-1 gap-8">
-                {visibleData.map((customer, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.1 }}
-                    className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden"
-                  >
-                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4">
-                      <div className="flex flex-col md:flex-row md:justify-between md:items-center">
-                        <h3 className="text-xl font-bold text-white">{customer.customerName}</h3>
-                        <div className="flex items-center gap-2 text-blue-100 mt-2 md:mt-0">
-                          <span className="text-white font-medium">Total Purchases:</span>
-                          <span className="bg-blue-400 bg-opacity-30 px-3 py-1 rounded-full text-white">
-                            {customer.purchaseFrequency}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="p-5">
-                      <div className="flex flex-col md:flex-row justify-between mb-6">
-                        <div className="mb-4 md:mb-0">
-                          <span className="text-gray-500 text-sm">Contact Number</span>
-                          <div className="font-medium text-gray-800 flex items-center mt-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                            </svg>
-                            {customer.mobileNo}
-                          </div>
-                        </div>
-                        
-                        <div className="bg-blue-50 px-6 py-3 rounded-lg flex items-center">
-                          <div className="mr-3">
-                            <span className="text-gray-500 text-sm">Total Sales</span>
-                            <div className="text-2xl font-bold text-blue-600">₹{customer.totalSales.toLocaleString(undefined, {maximumFractionDigits: 2})}</div>
-                          </div>
-                          <div className="text-green-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                            </svg>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-6">
-                        <h4 className="text-lg font-semibold text-gray-800 mb-3">Store Purchases</h4>
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          {customer.stores.map((store, storeIndex) => (
-                            <div 
-                              key={storeIndex} 
-                              className={`flex justify-between items-center p-3 ${storeIndex !== customer.stores.length - 1 ? 'border-b border-gray-200 mb-2' : ''}`}
-                            >
-                              <div className="flex items-center">
-                                <div className="w-2 h-2 rounded-full bg-blue-500 mr-3"></div>
-                                <span className="font-medium">{store.storeName}</span>
-                              </div>
-                              <span className="font-bold text-blue-600">₹{store.sales.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse bg-white shadow-lg rounded-lg overflow-hidden">
-                  <thead>
-                    <tr className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-                      <th className="text-left p-4">Customer Name</th>
-                      <th className="text-left p-4">Mobile Number</th>
-                      <th className="text-right p-4">Purchase Frequency</th>
-                      <th className="text-right p-4">Total Sales</th>
-                      <th className="text-left p-4">Store Name</th>
-                      <th className="text-right p-4">Store Sales</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-        {visibleData.flatMap((customer, customerIndex) => 
-          customer.stores.map((store, storeIndex) => (
-            <motion.tr 
-              key={`${customerIndex}-${storeIndex}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: (customerIndex * customer.stores.length + storeIndex) * 0.05 }}
-              className={(customerIndex % 2 === 0) ? "bg-white" : "bg-blue-50"}
-            >
-              <td className="p-4 border-t border-gray-200 font-medium">{customer.customerName}</td>
-              <td className="p-4 border-t border-gray-200">{customer.mobileNo}</td>
-              <td className="p-4 border-t border-gray-200 text-right">{customer.purchaseFrequency}</td>
-              <td className="p-4 border-t border-gray-200 text-right font-medium text-blue-600">
-                ₹{customer.totalSales.toLocaleString(undefined, {maximumFractionDigits: 2})}
-              </td>
-              <td className="p-4 border-t border-gray-200">{store.storeName}</td>
-              <td className="p-4 border-t border-gray-200 text-right font-medium text-blue-600">
-                ₹{store.sales.toLocaleString(undefined, {maximumFractionDigits: 2})}
-              </td>
-            </motion.tr>
-          ))
-        )}
-      </tbody>
-                </table>
-              </div>
-            )}
-
-            <div className="flex justify-center pt-6">
-              {hasMoreToShow && (
-                <button
-                  onClick={showMore}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 shadow-md transform transition hover:-translate-y-1"
-                >
-                  Show More
-                </button>
-              )}
-
-              {visibleItems > 5 && (
-                <button
-                  onClick={showLess}
-                  className="px-6 py-3 ml-3 bg-gray-100 text-gray-800 rounded-lg font-medium hover:bg-gray-200 shadow-md transform transition hover:-translate-y-1"
-                >
-                  Show Less
-                </button>
-              )}
-            </div>
+            <p className="text-lg font-semibold">Error fetching report. Please try again.</p>
           </motion.div>
-        ) : startDate && endDate ? (
-          <div className="p-10 text-center bg-blue-50 rounded-xl">
-            <p className="text-xl font-medium text-blue-800">No data found</p>
-            <p className="mt-2 text-blue-600">Try adjusting the filters to see results</p>
+        ) : data && data.length > 0 ? (
+          <div className="overflow-x-auto rounded-lg shadow-md">
+            <table className="w-full border-collapse bg-white">
+              <thead>
+                <tr className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
+                  <th className="text-left p-4 font-semibold">
+                    <div className="flex items-center gap-2">
+                      <User size={16} />
+                      <span>Customer Name</span>
+                    </div>
+                  </th>
+                  <th className="text-left p-4 font-semibold">
+                    <div className="flex items-center gap-2">
+                      <Phone size={16} />
+                      <span>Mobile Number</span>
+                    </div>
+                  </th>
+                  <th className="text-right p-4 font-semibold">
+                    <div className="flex items-center justify-end gap-2">
+                      <ShoppingBag size={16} />
+                      <span>Purchase Quantity</span>
+                    </div>
+                  </th>
+                  <th className="text-right p-4 font-semibold">
+                    <div className="flex items-center justify-end gap-2">
+                      <CreditCard size={16} />
+                      <span>Total Purchase</span>
+                    </div>
+                  </th>
+                  <th className="text-center p-4 font-semibold">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((customer: CustomerReportData, customerIndex: number) => (
+                  <React.Fragment key={customerIndex}>
+                    <tr
+                      className={`
+                        hover:bg-blue-50 transition-colors duration-150
+                        ${customerIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                        ${expandedCustomer === customerIndex ? "bg-blue-50" : ""}
+                      `}
+                      onClick={() => toggleExpand(customerIndex)}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <td className="p-4 border-t border-gray-200 font-medium">{customer.customerName}</td>
+                      <td className="p-4 border-t border-gray-200">{customer.mobileNo}</td>
+                      <td className="p-4 border-t border-gray-200 text-right">{customer.totalProducts}</td>
+                      <td className="p-4 border-t border-gray-200 text-right font-medium text-blue-600">
+                        ₹{customer.totalSales.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="p-4 border-t border-gray-200 text-center">
+                        <button className="text-blue-600 hover:text-blue-800 transition-colors duration-150">
+                          {expandedCustomer === customerIndex ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                        </button>
+                      </td>
+                    </tr>
+                    <AnimatePresence>
+                      {expandedCustomer === customerIndex && (
+                        <motion.tr
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3 }}
+                        >
+                          <td colSpan={5} className="p-0 border-t-0">
+                            <motion.div 
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.3, delay: 0.1 }}
+                              className="p-6 bg-blue-50 border-t border-b border-blue-100"
+                            >
+                              <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                                <ShoppingBag size={18} className="mr-2 text-blue-600" />
+                                Medicine Details
+                              </h4>
+                              <div className="bg-white rounded-lg shadow-sm">
+                                <div className="grid grid-cols-5 p-3 bg-gray-100 font-medium text-gray-700 border-b border-gray-200">
+                                  <div className="col-span-2">Medicine Name</div>
+                                  <div className="col-span-1 flex items-center gap-1">
+                                    <Receipt size={14} />
+                                    <span>Bill No</span>
+                                  </div>
+                                  <div className="col-span-1 flex items-center gap-1">
+                                    <Clock size={14} />
+                                    <span>Date</span>
+                                  </div>
+                                  <div className="col-span-1 text-center">Quantity</div>
+                                </div>
+                                {customer.bills[0]?.medicines.map((medicine: MedicineDetails, index: number) => (
+                                  <div
+                                    key={index}
+                                    className={`grid grid-cols-5 items-center p-4 ${
+                                      index !== customer.bills[0].medicines.length - 1 ? "border-b border-gray-200" : ""
+                                    }`}
+                                  >
+                                    <div className="col-span-2 font-medium text-gray-800">{medicine.name}</div>
+                                    <div className="col-span-1 text-gray-600">{customer.bills[0]?.billNo}</div>
+                                    <div className="col-span-1 text-gray-600">{new Date(customer.bills[0]?.date).toLocaleDateString()}</div>
+                                    <div className="col-span-1 text-center">
+                                      <span className="font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                                        {medicine.quantity}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </motion.div>
+                          </td>
+                        </motion.tr>
+                      )}
+                    </AnimatePresence>
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
-          <div className="p-10 text-center bg-blue-50 rounded-xl">
-            <p className="text-xl font-medium text-blue-700">Please select start and end dates to view the report</p>
-          </div>
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-12 text-center bg-blue-50 rounded-xl"
+          >
+            <ShoppingBag size={48} className="mx-auto mb-4 text-blue-300" />
+            <p className="text-xl font-medium text-blue-800">No data found</p>
+            <p className="text-blue-600 mt-2">Try adjusting your search criteria</p>
+          </motion.div>
         )}
       </div>
     </motion.div>

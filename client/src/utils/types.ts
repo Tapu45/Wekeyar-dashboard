@@ -23,21 +23,27 @@ export interface SummaryReport {
   }
 
   export interface CustomerReport {
-    success: boolean;
-    data: CustomerReportData[];
+    success: boolean; // Indicates if the API call was successful
+    data: CustomerReportData[]; // Array of customer report data
   }
   
   export interface CustomerReportData {
-    customerName: string;
-    mobileNo: string;
-    totalSales: number;
-    purchaseFrequency: number;
-    stores: StoreSales[];
+    customerName: string; // Customer's name
+    mobileNo: string; // Customer's mobile number
+    totalSales: number; // Total sales amount
+    totalProducts: number; // Total quantity of products purchased
+    bills: BillDetails[]; // Array of bills
   }
   
-  export interface StoreSales {
-    storeName: string;
-    sales: number;
+  export interface BillDetails {
+    billNo: string; // Bill number
+    date: string; // Date of the bill
+    medicines: MedicineDetails[]; // Array of medicines in the bill
+  }
+  
+  export interface MedicineDetails {
+    name: string; // Medicine name
+    quantity: number; // Quantity of the medicine
   }
 
   export interface StoreWiseSalesReport {

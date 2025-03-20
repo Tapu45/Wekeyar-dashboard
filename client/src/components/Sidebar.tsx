@@ -127,6 +127,9 @@ const Sidebar = ({
             <span className={isExpanded ? "block" : "hidden"}>Logout</span>
           </button>
         </nav>
+        <div className="mt-4 text-sm text-center">
+          <p className="text-white">Powered by Nexus Info Tech</p>
+        </div>
       </aside>
     </>
   );

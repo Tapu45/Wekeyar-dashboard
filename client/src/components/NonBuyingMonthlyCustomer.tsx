@@ -16,7 +16,6 @@ import api, { API_ROUTES } from "../utils/api"
 import { 
   ArrowUpDown, 
   Calendar, 
-  IndianRupee, 
   Phone, 
   User, 
   ChevronLeft, 
@@ -41,7 +40,7 @@ const getMonthlyNonBuyingCustomers = async (): Promise<MonthlyNonBuyingCustomer[
 const NonBuyingMonthlyCustomer: React.FC = () => {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [pageSize, setPageSize] = useState(5)
+  const [pageSize, setPageSize] = useState(10)
 
   const { data, isLoading, error } = useQuery<MonthlyNonBuyingCustomer[]>({
     queryKey: ["non-buying-monthly-customers"],
@@ -92,23 +91,7 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
           </div>
         ),
       }),
-      columnHelper.accessor("monthlyAvgPurchase", {
-        header: ({ column }) => (
-          <button
-            className="flex items-center gap-1 font-semibold text-blue-600 transition-all hover:text-blue-700"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            <IndianRupee className="w-4 h-4 text-blue-500" />
-            Monthly Avg
-            <ArrowUpDown className="w-3 h-3 ml-1 text-gray-400" />
-          </button>
-        ),
-        cell: ({ row }) => (
-          <div className="font-medium text-right text-green-600">
-            ₹{(row.original.monthlyAvgPurchase ?? 0).toLocaleString("en-IN")}
-          </div>
-        ),
-      }),
+
       columnHelper.accessor("lastPurchaseDate", {
         header: ({ column }) => (
           <button
@@ -160,7 +143,7 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="bg-white rounded-xl shadow-xl overflow-hidden"
+        className="overflow-hidden bg-white shadow-xl rounded-xl"
       >
         <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-800">
           <h2 className="text-2xl font-bold text-white">Non-Buying Monthly Customers</h2>
@@ -168,8 +151,8 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
         </div>
         <div className="flex items-center justify-center h-64">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-            <p className="text-blue-600 font-medium">Loading customer data...</p>
+            <div className="w-12 h-12 border-4 border-blue-200 rounded-full border-t-blue-600 animate-spin"></div>
+            <p className="font-medium text-blue-600">Loading customer data...</p>
           </div>
         </div>
       </motion.div>
@@ -181,14 +164,14 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="bg-white rounded-xl shadow-xl overflow-hidden"
+        className="overflow-hidden bg-white shadow-xl rounded-xl"
       >
         <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-800">
           <h2 className="text-2xl font-bold text-white">Non-Buying Monthly Customers</h2>
           <p className="text-blue-100">Error loading data</p>
         </div>
         <div className="p-8">
-          <div className="flex items-center justify-center p-6 bg-red-50 rounded-lg text-red-600">
+          <div className="flex items-center justify-center p-6 text-red-600 rounded-lg bg-red-50">
             <AlertCircle className="w-6 h-6 mr-2" />
             <p className="font-medium">Error loading customer data. Please try again later.</p>
           </div>
@@ -202,15 +185,15 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="bg-white rounded-xl shadow-xl overflow-hidden"
+        className="overflow-hidden bg-white shadow-xl rounded-xl"
       >
         <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-800">
           <h2 className="text-2xl font-bold text-white">Non-Buying Monthly Customers</h2>
           <p className="text-blue-100">No customers found</p>
         </div>
         <div className="p-8">
-          <div className="flex flex-col items-center justify-center p-10 bg-blue-50 rounded-lg">
-            <p className="text-xl font-medium text-blue-700 mb-2">No non-buying customers found</p>
+          <div className="flex flex-col items-center justify-center p-10 rounded-lg bg-blue-50">
+            <p className="mb-2 text-xl font-medium text-blue-700">No non-buying customers found</p>
             <p className="text-blue-600">All customers have made recent purchases</p>
           </div>
         </div>
@@ -257,7 +240,7 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="bg-white rounded-xl shadow-xl overflow-hidden"
+      className="overflow-hidden bg-white shadow-xl rounded-xl"
     >
       <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-800">
         <h2 className="text-2xl font-bold text-white">Non-Buying Monthly Customers</h2>
@@ -265,7 +248,7 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
       </div>
 
       <div className="p-6">
-        <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between mb-6">
+        <div className="flex flex-col justify-between gap-4 mb-6 md:flex-row md:items-center">
           <div className="relative w-full md:w-80">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
               <Search className="w-4 h-4 text-gray-400" />
@@ -275,7 +258,7 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name or phone..."
-              className="w-full px-10 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-10 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             {searchQuery && (
               <button
@@ -307,12 +290,12 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
           </div>
         </div>
 
-        <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <div className="overflow-hidden border border-gray-200 rounded-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-gray-700">
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id} className="bg-blue-50 border-b border-gray-200">
+                  <tr key={headerGroup.id} className="border-b border-gray-200 bg-blue-50">
                     {headerGroup.headers.map((header) => (
                       <th key={header.id} className="px-4 py-3 text-left">
                         {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
@@ -332,7 +315,7 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
                     <motion.tr
                       key={row.id}
                       variants={rowVariants}
-                      className="border-b border-gray-100 hover:bg-blue-50 transition-colors duration-200"
+                      className="transition-colors duration-200 border-b border-gray-100 hover:bg-blue-50"
                     >
                       {row.getVisibleCells().map((cell) => (
                         <td key={cell.id} className="px-4 py-3">
@@ -347,7 +330,7 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 px-2">
+        <div className="flex flex-col items-center justify-between gap-4 px-2 mt-4 sm:flex-row">
           <div className="text-sm text-gray-600">
             Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{" "}
             {Math.min(

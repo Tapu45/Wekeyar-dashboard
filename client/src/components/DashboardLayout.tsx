@@ -19,7 +19,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
       {/* Main Content */}
       <div
-        className={`flex-1 p-2 space-y-6 overflow-y-auto transition-all duration-300 ${
+        className={`flex-1 p-4 space-y-6 overflow-y-auto transition-all duration-300 ${
           isSidebarExpanded ? "ml-64" : "ml-20"
         }`}
       >

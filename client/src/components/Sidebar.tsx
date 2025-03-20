@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Store,
   UploadCloud,
+  LogOut,
 } from "lucide-react";
 
 interface SidebarLink {
@@ -24,17 +25,37 @@ const Sidebar: React.FC<{
 }> = ({ isExpanded, setIsExpanded }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  if (location.pathname === "/login") {
+    setIsExpanded(false);
+    return null;
+  }
 
   const links: SidebarLink[] = [
     { title: "Summary Report", path: "/", icon: LayoutDashboard },
-    { title: "Non-Buying Customers", path: "/non-buying-customers", icon: User },
-    { title: "Monthly Non-Buying", path: "/non-buying-monthly-customers", icon: ClipboardList },
+    {
+      title: "Non-Buying Customers",
+      path: "/non-buying-customers",
+      icon: User,
+    },
+    {
+      title: "Monthly Non-Buying",
+      path: "/non-buying-monthly-customers",
+      icon: ClipboardList,
+    },
     { title: "Customer Report", path: "/customer-report", icon: BarChart3 },
     { title: "Store Sales Report", path: "/store-sales-report", icon: Store },
     { title: "Upload", path: "/upload", icon: UploadCloud },
   ];
 
   const isActivePath = (path: string) => location.pathname === path;
+
+  const handleLogout = () => {
+    // Example cleanup logic (adjust as needed)
+    localStorage.removeItem("token");
+    navigate("/login");
+  };
 
   return (
     <>
@@ -59,28 +80,29 @@ const Sidebar: React.FC<{
       <aside
         className={`fixed top-0 left-0 h-screen bg-gradient-to-b from-blue-600 to-blue-800 shadow-xl transition-all duration-300 ease-in-out z-50 ${
           isExpanded ? "w-64" : "w-20"
-        } ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+        } ${
+          isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
       >
         {/* Logo Section */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-blue-500">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center">
-              <span className="text-blue-600 font-bold text-xl">W</span>
-            </div>
-            <h1
-              className={`font-bold text-white text-xl transition-opacity duration-200 ${
-                isExpanded ? "opacity-100" : "opacity-0 hidden"
-              }`}
-            >
-              Wekeyar
-            </h1>
+            {isExpanded ? (
+              <img src="/logo.png" alt="WekeyarPlus" className="w-full" />
+            ) : (
+              <h2 className="text-white text-2xl font-semibold">WP</h2>
+            )}
           </div>
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
             className="hidden md:block hover:bg-blue-500 p-1.5 rounded-lg transition-colors"
           >
-            {isExpanded ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+            {isExpanded ? (
+              <ChevronLeft size={20} />
+            ) : (
+              <ChevronRight size={20} />
+            )}
           </button>
         </div>
 
@@ -93,14 +115,18 @@ const Sidebar: React.FC<{
                 key={link.path}
                 to={link.path}
                 className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors hover:bg-blue-500/30 group relative ${
-                  isActivePath(link.path) ? "bg-white text-blue-700 font-medium shadow-md" : "text-white"
+                  isActivePath(link.path)
+                    ? "bg-white text-blue-700 font-medium shadow-md"
+                    : "text-white"
                 }`}
-                onClick={() => setIsMobileOpen(false)} // Close sidebar on mobile when a link is clicked
+                onClick={() => setIsMobileOpen(false)}
               >
                 <div className="flex items-center justify-center w-6">
                   <Icon
                     size={22}
-                    className={isActivePath(link.path) ? "text-blue-600" : "text-white"}
+                    className={
+                      isActivePath(link.path) ? "text-blue-600" : "text-white"
+                    }
                   />
                 </div>
                 <span
@@ -111,15 +137,36 @@ const Sidebar: React.FC<{
                   {link.title}
                 </span>
                 {!isExpanded && (
-                  <div
-                    className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-sm rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity"
-                  >
+                  <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-sm rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
                     {link.title}
                   </div>
                 )}
               </Link>
             );
           })}
+
+          {/* Logout Button */}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="relative flex items-center gap-3 px-3 py-3 rounded-lg transition-colors hover:bg-blue-500/30 group"
+          >
+            <div className="flex items-center justify-center w-6">
+              <LogOut size={22} className="text-white" />
+            </div>
+            <span
+              className={`font-medium whitespace-nowrap transition-all text-white duration-200 ${
+                isExpanded ? "opacity-100" : "opacity-0 hidden"
+              }`}
+            >
+              Logout
+            </span>
+            {!isExpanded && (
+              <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-sm rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                Logout
+              </div>
+            )}
+          </button>
         </nav>
 
         {/* Footer */}

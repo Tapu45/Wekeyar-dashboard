@@ -1,0 +1,12 @@
+import { Request, Response } from "express";
+import { PrismaClient } from "@prisma/client";
+export declare const prisma: PrismaClient<import(".prisma/client").Prisma.PrismaClientOptions, never, import("@prisma/client/runtime/library").DefaultArgs>;
+export declare const getSummary: (_req: Request, res: Response) => Promise<void>;
+export declare const getNonBuyingCustomers: (req: Request, res: Response) => Promise<void>;
+export declare const getNonBuyingMonthlyCustomers: (_req: Request, res: Response) => Promise<void>;
+export declare const getCustomerReport: (req: Request, res: Response) => Promise<void>;
+export declare const getStoreWiseSalesReport: (req: Request, res: Response) => Promise<void>;
+export declare const getAllCustomers: (_req: Request, res: Response) => Promise<void>;
+export declare const getYearlyRevenue: (_req: Request, res: Response) => Promise<void>;
+export declare const getMonthlyRevenue: (req: Request, res: Response) => Promise<void>;
+export declare const getAvailableYears: (_req: Request, res: Response) => Promise<void>;

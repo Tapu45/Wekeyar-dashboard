@@ -37,20 +37,15 @@ async function executeWithRetry(operation, maxRetries = 3) {
     throw lastError;
 }
 async function processExcelFile() {
-    let tempFilePath = '';
     let currentProgress = 0;
     try {
         const { fileUrl } = workerData;
         console.log(`Downloading file from Cloudinary: ${fileUrl}`);
-        tempFilePath = path.join(__dirname, "temp.xlsx");
-        const writer = fs.createWriteStream(tempFilePath);
         const response = await axios({
             method: 'get',
             url: fileUrl,
             responseType: 'stream'
         });
-        await pipeline(response.data, writer);
-        console.log(`File downloaded and saved to: ${tempFilePath}`);
         const startTime = Date.now();
         const storeMap = new Map();
         const customerMap = new Map();
@@ -73,7 +68,8 @@ async function processExcelFile() {
         let lastProgressUpdate = 0;
         const workbook = new ExcelJS.Workbook();
         console.time('Excel parsing');
-        await workbook.xlsx.readFile(tempFilePath);
+        await workbook.xlsx.read(response.data);
+        console.log('File downloaded and loaded into memory.');
         const worksheet = workbook.getWorksheet(1);
         rowCount = worksheet.rowCount;
         console.timeEnd('Excel parsing');
@@ -566,9 +562,6 @@ async function processExcelFile() {
                 processingTimeSeconds: processingTimeSeconds
             }
         });
-        if (fs.existsSync(tempFilePath)) {
-            fs.unlinkSync(tempFilePath);
-        }
         await prisma.$disconnect();
     }
     catch (error) {
@@ -578,9 +571,6 @@ async function processExcelFile() {
             error: error.message
         });
         try {
-            if (fs.existsSync(tempFilePath)) {
-                fs.unlinkSync(tempFilePath);
-            }
             await prisma.$disconnect();
         }
         catch (cleanupError) {

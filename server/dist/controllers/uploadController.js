@@ -52,15 +52,21 @@ const uploadExcelFile = async (req, res) => {
             res.status(400).json({ error: "No file uploaded" });
             return;
         }
-        const filePath = req.file.path;
+        const file = req.file;
         const fileName = req.file.originalname;
-        console.log(`Uploading file to Cloudinary: ${filePath}`);
-        const cloudinaryResult = await cloudinary_1.default.uploader.upload(filePath, {
-            folder: "uploads",
-            resource_type: "raw",
+        console.log("Uploading file to Cloudinary...");
+        const cloudinaryResult = await new Promise((resolve, reject) => {
+            const stream = cloudinary_1.default.uploader.upload_stream({ folder: "uploads", resource_type: "raw" }, (error, result) => {
+                if (error) {
+                    reject(error);
+                }
+                else {
+                    resolve(result);
+                }
+            });
+            stream.end(file.buffer);
         });
         console.log("File uploaded to Cloudinary:", cloudinaryResult.secure_url);
-        fs_1.default.unlinkSync(filePath);
         const uploadHistory = await prisma.uploadHistory.create({
             data: {
                 fileName,

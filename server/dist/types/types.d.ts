@@ -1,3 +1,4 @@
+import { Request } from "express";
 export interface SummaryReport {
     totalCustomers: number;
     activeCustomers: number;
@@ -18,4 +19,12 @@ export interface MonthlyNonBuyingCustomer {
     phone: string;
     monthlyAvgPurchase: number;
     lastPurchaseDate: Date | null;
+}
+export interface CustomRequest extends Request {
+    user?: {
+        id: number;
+        username: string;
+        email: string;
+        role: string;
+    };
 }

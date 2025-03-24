@@ -33,30 +33,36 @@ export const uploadExcelFile = async (req: Request, res: Response): Promise<void
       res.status(400).json({ error: "No file uploaded" });
       return;
     }
-
-    const filePath = req.file.path;
+    const file = req.file as Express.Multer.File;
     const fileName = req.file.originalname;
 
-      // Upload the file to Cloudinary
-      console.log(`Uploading file to Cloudinary: ${filePath}`);
-      const cloudinaryResult = await cloudinary.uploader.upload(filePath, {
-        folder: "uploads", // Specify the folder in Cloudinary
-        resource_type: "raw", // Use "raw" for non-image files like Excel
-      });
-  
-      console.log("File uploaded to Cloudinary:", cloudinaryResult.secure_url);
+    // Upload the file to Cloudinary directly from memory
+    console.log("Uploading file to Cloudinary...");
+    const cloudinaryResult = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: "uploads", resource_type: "raw" },
+        (error, result) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        }
+      );
+      stream.end(file.buffer); // Use the file buffer from memory
+    });
 
-      fs.unlinkSync(filePath);
+    console.log("File uploaded to Cloudinary:", (cloudinaryResult as any).secure_url);
 
     // Create an entry in the UploadHistory table with "in-progress" status
     const uploadHistory = await prisma.uploadHistory.create({
       data: {
         fileName,
-        fileUrl: cloudinaryResult.secure_url,
+        fileUrl: (cloudinaryResult as any).secure_url,
         status: "in-progress",
       },
     });
-  
+
     const workerPath = path.resolve(__dirname, "./excelProccessor.js");
     if (!fs.existsSync(workerPath)) {
       console.error(`Worker file does not exist at: ${workerPath}`);
@@ -71,13 +77,14 @@ export const uploadExcelFile = async (req: Request, res: Response): Promise<void
       return;
     }
 
+    // Start a worker thread to process the file
     const worker = new Worker(workerPath, {
-      workerData: { fileUrl: cloudinaryResult.secure_url }, // Pass the Cloudinary URL
+      workerData: { fileUrl: (cloudinaryResult as any).secure_url }, // Pass the Cloudinary URL
     });
 
     worker.on("message", async (message) => {
       if (message.status === "progress") {
-        console.log(`Received progress update from worker: ${message.progress}%`); // Debug log
+        console.log(`Received progress update from worker: ${message.progress}%`);
         broadcastProgress(message.progress);
       } else if (message.status === "completed") {
         // Update the status to "completed" in the UploadHistory table
@@ -122,6 +129,7 @@ export const uploadExcelFile = async (req: Request, res: Response): Promise<void
         message: "Error processing file",
       });
     });
+
     // Handle worker exit (unexpected termination)
     worker.on("exit", async (code) => {
       if (code !== 0) {

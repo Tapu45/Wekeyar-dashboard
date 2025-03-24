@@ -16,11 +16,16 @@ import UploadPage from "./components/UploadPage";
 import Login from "./components/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import DashboardLayout from "./components/DashboardLayout";
+import UserCreationPage from "./components/UserCreation";
+import Tellecalling from "./components/tellecalling";
+import TelecallingDashboard from "./components/TelecallingDashboard";
+import TelecallerRemarksOrders from "./components/TelecallerHistory";
 
 const queryClient = new QueryClient();
 
 const App: React.FC = () => {
   return (
+    
     <QueryClientProvider client={queryClient}>
       <Router>
         <Routes>
@@ -30,27 +35,110 @@ const App: React.FC = () => {
           <Route
             path="/"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["admin", "tellecaller"]}>
                 <DashboardLayout />
               </ProtectedRoute>
             }
           >
-            <Route index element={<SummaryReport />} />
+            {/* Default route: Redirect based on role */}
+            <Route
+              index
+              element={
+                <ProtectedRoute allowedRoles={["admin", "tellecaller"]}>
+                  <RoleBasedRedirect />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Summary Report accessible only by admin */}
+            <Route
+              path="summary-report"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <SummaryReport />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="non-buying-customers"
-              element={<NonBuyingCustomerReport />}
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <NonBuyingCustomerReport />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="non-buying-monthly-customers"
-              element={<NonBuyingMonthlyCustomer />}
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <NonBuyingMonthlyCustomer />
+                </ProtectedRoute>
+              }
             />
-            <Route path="customer-report" element={<CustomerReportPage />} />
+            <Route
+              path="customer-report"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <CustomerReportPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="store-sales-report"
-              element={<StoreWiseSalesReportPage />}
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <StoreWiseSalesReportPage />
+                </ProtectedRoute>
+              }
             />
-            <Route path="customers" element={<CustomerList />} />
-            <Route path="upload" element={<UploadPage />} />
+            <Route
+              path="customers"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <CustomerList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+  path="telecaller-remarks-orders"
+  element={
+    <ProtectedRoute allowedRoles={["tellecaller"]}>
+      <TelecallerRemarksOrders />
+    </ProtectedRoute>
+  }
+/>
+            <Route
+              path="upload"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <UploadPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="user"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <UserCreationPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="tellecalling"
+              element={
+                <ProtectedRoute allowedRoles={["tellecaller"]}>
+                  <Tellecalling />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+  path="telecalling-dashboard"
+  element={
+    <ProtectedRoute allowedRoles={["admin"]}>
+      <TelecallingDashboard />
+    </ProtectedRoute>
+  }
+/>
           </Route>
 
           {/* Catch all route */}
@@ -58,7 +146,33 @@ const App: React.FC = () => {
         </Routes>
       </Router>
     </QueryClientProvider>
+    
   );
 };
 
 export default App;
+
+/**
+ * RoleBasedRedirect Component
+ * Redirects users to the appropriate default page based on their role.
+ */
+const RoleBasedRedirect: React.FC = () => {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  try {
+    const decoded: { role: string } = JSON.parse(atob(token.split(".")[1]));
+    if (decoded.role === "admin") {
+      return <Navigate to="/summary-report" replace />;
+    } else if (decoded.role === "tellecaller") {
+      return <Navigate to="/tellecalling" replace />;
+    }
+  } catch (error) {
+    console.error("Failed to decode token:", error);
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to="/login" replace />;
+};

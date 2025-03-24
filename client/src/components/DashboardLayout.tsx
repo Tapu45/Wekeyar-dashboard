@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
+import { jwtDecode } from "jwt-decode";
 
 interface DashboardLayoutProps {
   children?: React.ReactNode;
@@ -8,6 +9,19 @@ interface DashboardLayoutProps {
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [userRole, setUserRole] = useState<string>("");
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const decoded: { role: string } = jwtDecode(token);
+        setUserRole(decoded.role);
+      } catch (error) {
+        console.error("Failed to decode token:", error);
+      }
+    }
+  }, []);
 
   return (
     <div className="flex h-screen">
@@ -15,6 +29,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       <Sidebar
         isExpanded={isSidebarExpanded}
         setIsExpanded={setIsSidebarExpanded}
+        userRole={userRole} // Pass the user's role to the Sidebar
       />
 
       {/* Main Content */}

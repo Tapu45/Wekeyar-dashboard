@@ -1,0 +1,11 @@
+import { Request, Response } from "express";
+import { CustomRequest } from "../types/types";
+export declare const getTelecallingCustomers: (_req: Request, res: Response) => Promise<void>;
+export declare const getProducts: (req: Request, res: Response) => Promise<void>;
+export declare const saveTelecallingOrder: (req: CustomRequest, res: Response) => Promise<void>;
+export declare const getTelecallingOrders: (_req: Request, res: Response) => Promise<void>;
+export declare const getAllTelecallingOrders: (_req: Request, res: Response) => Promise<void>;
+export declare const getNewProducts: (_req: Request, res: Response) => Promise<void>;
+export declare const getTelecallersWithOrderCount: (_req: Request, res: Response) => Promise<void>;
+export declare const updateCustomerRemarks: (req: CustomRequest, res: Response) => Promise<void>;
+export declare const getTelecallerRemarksOrders: (req: CustomRequest, res: Response) => Promise<void>;

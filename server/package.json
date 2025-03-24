@@ -24,6 +24,7 @@
     "@faker-js/faker": "^9.5.1",
     "@prisma/client": "^6.4.1",
     "axios": "^1.8.3",
+    "bcrypt": "^5.1.1",
     "cloudinary": "^2.6.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -41,10 +42,11 @@
     "xlsx-stream-reader": "^1.1.1"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
     "@types/cookie-parser": "^1.4.8",
     "@types/cors": "^2.8.17",
     "@types/date-fns": "^2.6.3",
-    "@types/express": "^5.0.0",
+    "@types/express": "^5.0.1",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.13.8",

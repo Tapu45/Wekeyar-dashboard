@@ -9,8 +9,6 @@ router.get("/non-buying-monthly-customers", reportController_1.getNonBuyingMonth
 router.get("/customer-report", reportController_1.getCustomerReport);
 router.get("/store-sales-report", reportController_1.getStoreWiseSalesReport);
 router.get("/customers", reportController_1.getAllCustomers);
-router.get('/yearly', reportController_1.getYearlyRevenue);
-router.get('/monthly/:year', reportController_1.getMonthlyRevenue);
-router.get('/years', reportController_1.getAvailableYears);
+router.get("/inactive-customers", reportController_1.getInactiveCustomers);
 exports.default = router;
 //# sourceMappingURL=routes.js.map

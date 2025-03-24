@@ -28,5 +28,15 @@ export const API_ROUTES = {
     LOGIN: "/auth/login",
     LOGOUT: "/auth/logout",
     CHECK_AUTH: "/auth/check-auth",
+    CREATE_USER: "/user/create-user",
+    INACTIVE_CUSTOMERS: "/reports/inactive-customers",
+    TELECALLING_PRODUCTS: "/telecalling/products",
+    TELECALLING_ORDERS: "/telecalling/orders",
+    TELECALLING_CUSTOMERS: "/telecalling/customers",
+    TELECALLERS_WITH_ORDERS: "/telecalling/telecallers-with-orders", // Added route
+    TELECALLING_ALL_ORDERS: "/telecalling/telecalling-orders", // Added route
+    TELECALLING_NEW_PRODUCTS: "/telecalling/new-products", // Added route
+    TELECALLING_UPDATE_REMARKS: "/telecalling/customers/:id/remarks", // Added route
+    TELECALLER_REMARKS_ORDERS: "/telecalling/telecaller/remarks-orders", // Added route
   };
   

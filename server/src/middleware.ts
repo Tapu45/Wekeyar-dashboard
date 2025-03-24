@@ -3,18 +3,20 @@ import multer from 'multer';
 import path from 'path';
 import { Request } from 'express';
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    const uploadPath = path.resolve(__dirname, '../uploads/');
-    console.log(`Saving file to: ${uploadPath}`);
-    cb(null, uploadPath);
-  },
-  filename: (_req, file, cb) => {
-    const filename = `${Date.now()}-${file.originalname}`;
-    console.log(`Generated filename: ${filename}`);
-    cb(null, filename);
-  }
-});
+// const storage = multer.diskStorage({
+//   destination: (_req, _file, cb) => {
+//     const uploadPath = path.resolve(__dirname, '../uploads/');
+//     console.log(`Saving file to: ${uploadPath}`);
+//     cb(null, uploadPath);
+//   },
+//   filename: (_req, file, cb) => {
+//     const filename = `${Date.now()}-${file.originalname}`;
+//     console.log(`Generated filename: ${filename}`);
+//     cb(null, filename);
+//   }
+// });
+
+const storage = multer.memoryStorage(); 
 
 const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   console.log(`File received: ${file.originalname}`);
@@ -43,3 +45,4 @@ export const uploadMiddleware = multer({
   fileFilter: fileFilter,
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 }).single('excelFile');
+

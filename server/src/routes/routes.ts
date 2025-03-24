@@ -8,9 +8,7 @@ import {
   getCustomerReport,
   getStoreWiseSalesReport,
   getAllCustomers,
-  getYearlyRevenue,
-  getMonthlyRevenue,
-  getAvailableYears,
+  getInactiveCustomers,
 } from "../controllers/reportController";
 
 router.get("/summary", getSummary);
@@ -19,12 +17,6 @@ router.get("/non-buying-monthly-customers", getNonBuyingMonthlyCustomers);
 router.get("/customer-report", getCustomerReport);
 router.get("/store-sales-report", getStoreWiseSalesReport);
 router.get("/customers", getAllCustomers);
-router.get('/yearly', getYearlyRevenue);
-
-// Get monthly revenue data for a specific year
-router.get('/monthly/:year', getMonthlyRevenue);
-
-// Get available years for filtering
-router.get('/years', getAvailableYears);
+router.get("/inactive-customers", getInactiveCustomers);
 
 export default router;

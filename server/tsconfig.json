@@ -21,6 +21,7 @@
     "declaration": true,
     "lib": ["ES2020"],
     "allowJs": true
-  }
+  },
+  "include": ["src/**/*"]
 }
 

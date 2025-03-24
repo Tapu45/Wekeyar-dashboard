@@ -7,6 +7,4 @@ export declare const getNonBuyingMonthlyCustomers: (_req: Request, res: Response
 export declare const getCustomerReport: (req: Request, res: Response) => Promise<void>;
 export declare const getStoreWiseSalesReport: (req: Request, res: Response) => Promise<void>;
 export declare const getAllCustomers: (_req: Request, res: Response) => Promise<void>;
-export declare const getYearlyRevenue: (_req: Request, res: Response) => Promise<void>;
-export declare const getMonthlyRevenue: (req: Request, res: Response) => Promise<void>;
-export declare const getAvailableYears: (_req: Request, res: Response) => Promise<void>;
+export declare const getInactiveCustomers: (req: Request, res: Response) => Promise<void>;

@@ -12,11 +12,53 @@ export const getSummary = async (req: Request, res: Response) => {
   try {
     const { fromDate, toDate, storeId } = req.query;
 
-    const startDate = fromDate ? new Date(fromDate as string) : new Date();
-    const endDate = toDate ? new Date(toDate as string) : new Date();
+    // Default date range: current month and previous month
+    const today = new Date();
+    const previousMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const previousMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
+
+    const startDate = fromDate ? new Date(fromDate as string) : previousMonthStart;
+    const endDate = toDate ? new Date(toDate as string) : previousMonthEnd;
 
     // Total customers count
     const totalCustomers = await prisma.customer.count();
+
+    // Fetch inactive customers (customers with no bills in the specified date range)
+    const inactiveCustomers = await prisma.customer.findMany({
+      where: {
+        bills: {
+          none: {
+            date: {
+              gte: startDate,
+              lte: endDate,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        bills: {
+          select: { date: true },
+          orderBy: { date: "desc" },
+          take: 1,
+        },
+      },
+    });
+
+    // Apply additional filtering to exclude customers whose last purchase date is after the `endDate`
+    const filteredInactiveCustomers = inactiveCustomers.filter((customer) => {
+      const lastPurchaseDate = customer.bills.length
+        ? new Date(customer.bills[0].date)
+        : null;
+
+      // Include customers with no purchase history or last purchase before `endDate`
+      return !lastPurchaseDate || lastPurchaseDate <= endDate;
+    });
+
+    const inactiveCustomerCount = filteredInactiveCustomers.length;
+
+    // Calculate active customers by subtracting inactive customers from total customers
+    const activeCustomerCount = totalCustomers - inactiveCustomerCount;
 
     // Total revenue
     const totalRevenueData = await prisma.bill.aggregate({
@@ -30,46 +72,16 @@ export const getSummary = async (req: Request, res: Response) => {
       },
     });
 
-    // Fetch customers with transactions
-    const activeCustomers = await prisma.customer.findMany({
-      where: {
-        bills: {
-          some: {
-            date: {
-              gte: startDate,
-              lte: endDate,
-            },
-            ...(storeId ? { storeId: Number(storeId) } : {}),
-          },
-        },
-      },
-      include: {
-        bills: {
-          where: {
-            date: {
-              gte: startDate,
-              lte: endDate,
-            },
-          },
-        },
-      },
-    });
-
-    // Filter active customers (repeat buyers)
-    const repeatBuyers = activeCustomers.filter(
-      (customer) => customer.bills.length > 1
-    );
-    const inactiveCustomers = totalCustomers - repeatBuyers.length;
-
     // Calculate average monthly revenue
     const avgMonthlyRevenue = totalRevenueData._sum.netAmount
       ? totalRevenueData._sum.netAmount / 12
       : 0;
 
+    // Prepare the summary response
     const summary = {
       totalCustomers,
-      activeCustomers: repeatBuyers.length,
-      inactiveCustomers,
+      activeCustomers: activeCustomerCount,
+      inactiveCustomers: inactiveCustomerCount,
       totalRevenue: totalRevenueData._sum.netAmount || 0,
       avgMonthlyRevenue,
     };
@@ -292,24 +304,39 @@ export const getStoreWiseSalesReport = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { date } = req.query;
-    const selectedDate = date ? new Date(date as string) : new Date(); // Default to today
+    const { date, searchQuery } = req.query;
+
+    // Default to today's date if no date is provided
+    const selectedDate = date ? new Date(date as string) : new Date();
 
     const previousDay = subDays(selectedDate, 1);
     const previousWeek = subWeeks(selectedDate, 1);
     const previousMonth = subMonths(selectedDate, 1);
 
-    // Get all stores
-    const stores = await prisma.store.findMany();
+    // Calculate the start and end of the current month
+    const currentMonthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    const currentMonthEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59);
 
-    // Function to get sales data for a specific date
-    const fetchSalesData = async (storeId: number, targetDate: Date) => {
+    // Fetch stores with optional filtering by searchQuery
+    const stores = await prisma.store.findMany({
+      where: {
+        OR: searchQuery
+          ? [
+              { storeName: { contains: searchQuery as string, mode: "insensitive" } },
+              { address: { contains: searchQuery as string, mode: "insensitive" } },
+            ]
+          : undefined,
+      },
+    });
+
+    // Function to get sales data for a specific date range
+    const fetchSalesDataForRange = async (storeId: number, startDate: Date, endDate: Date) => {
       const sales = await prisma.bill.findMany({
         where: {
           storeId,
           date: {
-            gte: new Date(targetDate.setHours(0, 0, 0, 0)),
-            lt: new Date(targetDate.setHours(23, 59, 59, 999)),
+            gte: startDate,
+            lte: endDate,
           },
         },
         select: {
@@ -334,48 +361,14 @@ export const getStoreWiseSalesReport = async (
       };
     };
 
-    // Function to find the latest available sales before a given date
-    const fetchLatestAvailableSales = async (
-      storeId: number,
-      referenceDate: Date
-    ) => {
-      const latestBill = await prisma.bill.findFirst({
-        where: {
-          storeId,
-          date: { lt: referenceDate },
-        },
-        orderBy: { date: "desc" },
-        select: { date: true },
-      });
-
-      if (!latestBill) {
-        return {
-          totalNetAmount: 0,
-          totalBills: 0,
-          totalItemsSold: 0,
-          referenceDate: null, // No data available
-        };
-      }
-
-      return await fetchSalesData(storeId, latestBill.date);
-    };
-
     // Generate report for all stores
     const storeReports = await Promise.all(
       stores.map(async (store) => {
-        const currentSales = await fetchSalesData(store.id, selectedDate);
-        const previousDaySales = await fetchLatestAvailableSales(
-          store.id,
-          previousDay
-        );
-        const previousWeekSales = await fetchLatestAvailableSales(
-          store.id,
-          previousWeek
-        );
-        const previousMonthSales = await fetchLatestAvailableSales(
-          store.id,
-          previousMonth
-        );
+        const currentSales = await fetchSalesDataForRange(store.id, selectedDate, selectedDate);
+        const previousDaySales = await fetchSalesDataForRange(store.id, previousDay, previousDay);
+        const previousWeekSales = await fetchSalesDataForRange(store.id, previousWeek, previousWeek);
+        const previousMonthSales = await fetchSalesDataForRange(store.id, previousMonth, previousMonth);
+        const currentMonthSales = await fetchSalesDataForRange(store.id, currentMonthStart, currentMonthEnd);
 
         return {
           storeName: store.storeName,
@@ -390,6 +383,7 @@ export const getStoreWiseSalesReport = async (
             previousDay: previousDaySales,
             previousWeek: previousWeekSales,
             previousMonth: previousMonthSales,
+            currentMonth: currentMonthSales,
           },
         };
       })
@@ -487,142 +481,86 @@ export const getAllCustomers = async (
   }
 };
 
-/**
- * Get yearly revenue data for the last 5 years
- */
-export const getYearlyRevenue = async (_req: Request, res: Response) => {
+export const getInactiveCustomers = async (req: Request, res: Response) => {
   try {
-    const currentYear = new Date().getFullYear();
-    const startYear = currentYear - 4; // Last 5 years
+    const { fromDate, toDate } = req.query;
 
-    // Generate array of years to query
-    const years = Array.from({ length: 5 }, (_, i) => startYear + i);
+    // Default date range: current month and previous month
+    const today = new Date();
+    const defaultFromDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const defaultToDate = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
 
-    const yearlyRevenue = await Promise.all(
-      years.map(async (year) => {
-        const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
-        const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
+    const startDate = fromDate ? new Date(fromDate as string) : defaultFromDate;
+    const endDate = toDate ? new Date(toDate as string) : defaultToDate;
 
-        const revenue = await prisma.bill.aggregate({
-          _sum: {
-            netAmount: true,
-          },
-          where: {
+    // Fetch customers with no bills in the specified date range
+    const customers = await prisma.customer.findMany({
+      where: {
+        bills: {
+          none: {
             date: {
               gte: startDate,
               lte: endDate,
             },
           },
-        });
-
-        return {
-          year,
-          revenue: revenue._sum.netAmount || 0,
-        };
-      })
-    );
-
-    res.status(200).json(yearlyRevenue);
-  } catch (error) {
-    console.error("Error fetching yearly revenue:", error);
-    res.status(500).json({ error: "Failed to fetch yearly revenue data" });
-  }
-};
-
-/**
- * Get monthly revenue data for a specific year
- */
-export const getMonthlyRevenue = async (req: Request, res: Response) => {
-  try {
-    const { year } = req.params;
-    const selectedYear = parseInt(year) || new Date().getFullYear();
-
-    // Generate all months of the year
-    const months = Array.from({ length: 12 }, (_, i) => i + 1);
-
-    const monthlyRevenue = await Promise.all(
-      months.map(async (month) => {
-        // Create date range for the month
-        const startDate = new Date(
-          `${selectedYear}-${month
-            .toString()
-            .padStart(2, "0")}-01T00:00:00.000Z`
-        );
-
-        // Calculate the last day of the month
-        const lastDay = new Date(selectedYear, month, 0).getDate();
-        const endDate = new Date(
-          `${selectedYear}-${month
-            .toString()
-            .padStart(2, "0")}-${lastDay}T23:59:59.999Z`
-        );
-
-        const revenue = await prisma.bill.aggregate({
-          _sum: {
-            netAmount: true,
-          },
-          where: {
-            date: {
-              gte: startDate,
-              lte: endDate,
-            },
-          },
-        });
-
-        return {
-          month,
-          monthName: new Date(selectedYear, month - 1, 1).toLocaleString(
-            "default",
-            { month: "short" }
-          ),
-          revenue: revenue._sum.netAmount || 0,
-        };
-      })
-    );
-
-    res.status(200).json(monthlyRevenue);
-  } catch (error) {
-    console.error("Error fetching monthly revenue:", error);
-    res.status(500).json({ error: "Failed to fetch monthly revenue data" });
-  }
-};
-
-/**
- * Get available years for filtering
- */
-export const getAvailableYears = async (_req: Request, res: Response) => {
-  try {
-    // Find the earliest and latest years in the database
-    const earliestBill = await prisma.bill.findFirst({
-      orderBy: { date: "asc" },
-      select: { date: true },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        bills: {
+          select: { date: true, store: { select: { storeName: true } } },
+          orderBy: { date: "desc" },
+          take: 1,
+        },
+      },
     });
 
-    const latestBill = await prisma.bill.findFirst({
-      orderBy: { date: "desc" },
-      select: { date: true },
+    // Fetch statuses from the TelecallingCustomer table
+    const telecallingStatuses = await prisma.telecallingCustomer.findMany({
+      where: {
+        customerId: { in: customers.map((customer) => customer.id) },
+      },
+      select: {
+        customerId: true,
+        status: true,
+      },
     });
 
-    // Get the current year
-    const currentYear = new Date().getFullYear();
-
-    // Determine the range of years
-    const earliestYear = earliestBill
-      ? earliestBill.date.getFullYear()
-      : currentYear;
-    const latestYear = latestBill
-      ? Math.max(latestBill.date.getFullYear(), currentYear)
-      : currentYear;
-
-    // Generate the list of years
-    const years = Array.from(
-      { length: latestYear - earliestYear + 1 },
-      (_, i) => earliestYear + i
+    // Create a map of statuses for quick lookup
+    const statusMap = new Map(
+      telecallingStatuses.map((entry) => [entry.customerId, entry.status])
     );
 
-    res.status(200).json(years);
+    // Filter out customers whose last purchase date is after the `endDate`
+    const result = customers
+      .filter((customer) => {
+        const lastPurchaseDate = customer.bills.length
+          ? new Date(customer.bills[0].date)
+          : null;
+
+        // Include customers with no purchase history or last purchase before `endDate`
+        return !lastPurchaseDate || lastPurchaseDate <= endDate;
+      })
+      .map((customer) => ({
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        lastPurchaseDate: customer.bills.length
+          ? customer.bills[0].date.toISOString()
+          : null,
+        storeName: customer.bills.length
+          ? customer.bills[0].store?.storeName || null
+          : null,
+        status: statusMap.get(customer.id) || "inactive", // Default to "inactive" if no status is found
+      }));
+
+    res.json(result);
   } catch (error) {
-    console.error("Error fetching available years:", error);
-    res.status(500).json({ error: "Failed to fetch available years" });
+    console.error("Error fetching inactive customers:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
+
+

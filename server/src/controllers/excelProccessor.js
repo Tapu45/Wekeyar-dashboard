@@ -42,15 +42,14 @@ async function executeWithRetry(operation, maxRetries = 3) {
 }
 
 async function processExcelFile() {
-  let tempFilePath = '';
+  
   let currentProgress = 0;
   try {
     const { fileUrl } = workerData;
     console.log(`Downloading file from Cloudinary: ${fileUrl}`);
     
     // Download file using streaming to reduce memory usage
-    tempFilePath = path.join(__dirname, "temp.xlsx");
-    const writer = fs.createWriteStream(tempFilePath);
+  
     
     const response = await axios({
       method: 'get',
@@ -58,8 +57,7 @@ async function processExcelFile() {
       responseType: 'stream'
     });
     
-    await pipeline(response.data, writer);
-    console.log(`File downloaded and saved to: ${tempFilePath}`);
+  
     
     // Track progress
     const startTime = Date.now();
@@ -91,7 +89,8 @@ async function processExcelFile() {
     const workbook = new ExcelJS.Workbook();
     console.time('Excel parsing');
     
-    await workbook.xlsx.readFile(tempFilePath);
+    await workbook.xlsx.read(response.data);
+    console.log('File downloaded and loaded into memory.');
     const worksheet = workbook.getWorksheet(1); // Get the first worksheet
     rowCount = worksheet.rowCount;
     
@@ -720,9 +719,7 @@ async function processExcelFile() {
     });
     
     // Clean up resources
-    if (fs.existsSync(tempFilePath)) {
-      fs.unlinkSync(tempFilePath);
-    }
+    
     await prisma.$disconnect();
   } catch (error) {
     console.error('Worker error:', error);
@@ -733,9 +730,7 @@ async function processExcelFile() {
     
     // Clean up
     try {
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
-      }
+     
       await prisma.$disconnect();
     } catch (cleanupError) {
       console.error('Error during cleanup:', cleanupError);

@@ -4,21 +4,31 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./routes/authRoutes";
 import routes from "./routes/routes";
 import uploadRoutes from "./routes/upload.route";
-// import path from "path";
-// import fs from "fs";
+import userRoutes from "./routes/userRoutes";
+import tellicallingRoutes from "./routes/telicallingRoutes";
+import dotenv from "dotenv";
 import http from "http"; // Import HTTP module
-import { initializeWebSocketServer } from "./utils/Websocket"; // Import WebSocket server
 import { PrismaClient } from "@prisma/client"; // Import PrismaClient
+import setupSocketIO from "./utils/Socket";
+import { Server } from "socket.io";
 
 const app = express();
 const prisma = new PrismaClient();
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Allow all origins (adjust for production)
+    methods: ["GET", "POST"],
+  },
+});
 
 // Create uploads directory if it doesn't exist
 // const uploadsDir = path.join(__dirname, "../uploads");
 // if (!fs.existsSync(uploadsDir)) {
 //   fs.mkdirSync(uploadsDir, { recursive: true });
 // }
-
+dotenv.config();
 app.use(express.json()); // To parse JSON request bodies
 app.use(cookieParser()); // To parse cookies
 
@@ -27,9 +37,13 @@ app.use(cors({ origin: "*" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+setupSocketIO(io);
+
 app.use("/reports", routes);
 app.use("/api", uploadRoutes);
-app.use("/auth", authRoutes); //
+app.use("/auth", authRoutes); 
+app.use("/user", userRoutes);
+app.use("/telecalling", tellicallingRoutes);
 
 // Error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -56,13 +70,9 @@ const cleanupInterruptedUploads = async () => {
 
 // Call the cleanup function before starting the server
 cleanupInterruptedUploads().then(() => {
-  const server = http.createServer(app);
-
-  // Initialize WebSocket server
-  initializeWebSocketServer(server);
-
+ 
   // Start the server
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 4000;
   server.listen(port, () => {
     console.log(`⚡️[server]: Server is listening on port ${port}!`);
   });

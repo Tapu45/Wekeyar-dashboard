@@ -16,7 +16,7 @@ import {
   MessageSquare
 } from "lucide-react";
 
-const socket = io("http://localhost:4000"); // Replace with your server URL
+const socket = io(import.meta.env.VITE_API_URL); // Replace with your server URL
 
 interface Customer {
   id: number;
@@ -288,7 +288,7 @@ const Telecalling: React.FC = () => {
       return;
     }
 
-
+   
 
     const requestBody = {
       telecallingCustomerId: selectedCustomer.customerId,

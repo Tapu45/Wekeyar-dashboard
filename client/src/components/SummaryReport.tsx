@@ -6,7 +6,7 @@ import api, { API_ROUTES } from "../utils/api";
 import InactiveCustomerList from "./InactiveCustomerList";
 import { FaUsers, FaUserCheck, FaUserTimes, FaCalendarAlt, FaFilter, FaChevronDown } from "react-icons/fa";
 
-const socket = io("http://localhost:4000"); // Replace with your server URL
+const socket = io(import.meta.env.VITE_API_URL); // Replace with your server URL
 
 interface SummaryData {
   totalCustomers: number;

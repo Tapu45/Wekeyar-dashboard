@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 import { useQuery } from "@tanstack/react-query";
 import api, { API_ROUTES } from "../utils/api";
 import InactiveCustomerList from "./InactiveCustomerList";
-import { FaUsers, FaUserCheck, FaUserTimes, FaCalendarAlt, FaFilter, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { FaUsers, FaUserCheck, FaUserTimes, FaCalendarAlt, FaFilter, FaChevronDown } from "react-icons/fa";
 
 const socket = io("http://localhost:4000"); // Replace with your server URL
 

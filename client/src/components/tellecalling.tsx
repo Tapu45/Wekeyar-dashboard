@@ -288,7 +288,7 @@ const Telecalling: React.FC = () => {
       return;
     }
 
-    const isNewProduct = !products.some((product) => product.name.toLowerCase() === productName.toLowerCase());
+
 
     const requestBody = {
       telecallingCustomerId: selectedCustomer.customerId,

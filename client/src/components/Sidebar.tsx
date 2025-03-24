@@ -86,10 +86,7 @@ const Sidebar = ({
     collapsed: { width: "5rem" },
   };
 
-  const mobileMenuVariants = {
-    open: { x: 0, opacity: 1 },
-    closed: { x: "-100%", opacity: 0 },
-  };
+ 
 
   const itemVariants = {
     hover: { scale: 1.03, x: 5 },

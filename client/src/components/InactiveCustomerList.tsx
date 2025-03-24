@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import api, { API_ROUTES } from "../utils/api";
-import { FaStore, FaUser, FaPhone, FaCalendar, FaCheckSquare, FaRegSquare, FaSearch, FaSpinner, FaPaperPlane, FaCheck, FaSort } from "react-icons/fa";
+import { FaStore, FaUser, FaPhone, FaCalendar, FaCheckSquare, FaRegSquare, FaSearch, FaPaperPlane, FaCheck, FaSort } from "react-icons/fa";
 
 interface InactiveCustomer {
   id: number;

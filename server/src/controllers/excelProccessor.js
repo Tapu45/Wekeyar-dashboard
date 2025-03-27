@@ -186,10 +186,11 @@ async function processExcelFile() {
       for (const value of rowArray) {
         if (!value) continue;
         const strValue = String(value).trim();
-        if (/^\d{2}-\d{2}-\d{4}$/.test(strValue)) {
-          const [day, month, year] = strValue.split("-");
+        // Improved regex to match DD-MM-YYYY format
+        const dateMatch = strValue.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if (dateMatch) {
+          const [, day, month, year] = dateMatch;
           const date = new Date(`${year}-${month}-${day}`);
-          lastValidDate = date;
           return date;
         }
       }
@@ -372,12 +373,20 @@ async function processExcelFile() {
       // Bill number row
       else if (currentCustomer && isBillNumberRow(rowArray)) {
         const billNo = extractBillNumber(rowArray);
+
+        let billDate = currentCustomer.date;
+        for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
+          if (isDateRow(sheetRows[j])) {
+            billDate = extractDate(sheetRows[j]);
+            break;
+          }
+        }
         
         const newBill = {
           billNo: billNo,
           customerPhone: currentCustomer.phone,
           customerName: currentCustomer.name,
-          date: currentCustomer.date,
+          date: billDate,
           items: [],
           totalAmount: 0,
           cash: 0,

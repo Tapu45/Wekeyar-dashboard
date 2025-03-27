@@ -6,12 +6,18 @@ async function clearDatabase() {
   try {
     console.log('Clearing database...');
 
-    // Delete all records from dependent tables first
+    // Delete records from dependent tables first
     await prisma.billDetails.deleteMany(); // Clear bill details
     await prisma.bill.deleteMany(); // Clear bills
+    await prisma.telecallingOrderDetails.deleteMany(); // Clear telecalling order details
+    await prisma.telecallingOrder.deleteMany(); // Clear telecalling orders
+    await prisma.telecallerHandledCustomer.deleteMany(); // Clear telecaller handled customers
+    await prisma.telecallingCustomer.deleteMany(); // Clear telecalling customers
+    await prisma.uploadHistory.deleteMany(); // Clear upload history
     await prisma.customer.deleteMany(); // Clear customers
     await prisma.store.deleteMany(); // Clear stores
-    await prisma.uploadHistory.deleteMany(); // Clear upload history
+    await prisma.product.deleteMany(); // Clear products
+    await prisma.user.deleteMany(); // Clear users
 
     console.log('Database cleared successfully.');
   } catch (error) {
@@ -22,5 +28,3 @@ async function clearDatabase() {
 }
 
 clearDatabase();
-
-//npx ts-node d:\Nexus\wekeyardashboard\server\src\utils\ClearDatabase.ts

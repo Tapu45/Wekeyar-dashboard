@@ -564,3 +564,38 @@ export const getInactiveCustomers = async (req: Request, res: Response) => {
 };
 
 
+export const getBillDetailsByBillNo = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { billNo } = req.params;
+
+    // Validate billNo
+    if (!billNo) {
+      res.status(400).json({ error: "Bill number is required" });
+      return;
+    }
+
+    // Fetch the bill details
+    const bill = await prisma.bill.findUnique({
+      where: { billNo },
+      include: {
+        customer: true, // Include customer details
+        store: true,    // Include store details
+        billDetails: true, // Include bill details (items, quantity, etc.)
+      },
+    });
+
+    // If no bill is found, return an error
+    if (!bill) {
+     res.status(404).json({ error: "Bill not found" });
+      return;
+    }
+
+    // Return the bill details
+    res.status(200).json(bill);
+  } catch (error) {
+    console.error("Error fetching bill details:", error);
+    res.status(500).json({ error: "Failed to fetch bill details" });
+  }
+};
+
+

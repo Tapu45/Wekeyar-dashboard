@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getInactiveCustomers = exports.getAllCustomers = exports.getStoreWiseSalesReport = exports.getCustomerReport = exports.getNonBuyingMonthlyCustomers = exports.getNonBuyingCustomers = exports.getSummary = exports.prisma = void 0;
+exports.getBillDetailsByBillNo = exports.getInactiveCustomers = exports.getAllCustomers = exports.getStoreWiseSalesReport = exports.getCustomerReport = exports.getNonBuyingMonthlyCustomers = exports.getNonBuyingCustomers = exports.getSummary = exports.prisma = void 0;
 const client_1 = require("@prisma/client");
 const date_fns_1 = require("date-fns");
 exports.prisma = new client_1.PrismaClient();
@@ -410,4 +410,31 @@ const getInactiveCustomers = async (req, res) => {
     }
 };
 exports.getInactiveCustomers = getInactiveCustomers;
+const getBillDetailsByBillNo = async (req, res) => {
+    try {
+        const { billNo } = req.params;
+        if (!billNo) {
+            res.status(400).json({ error: "Bill number is required" });
+            return;
+        }
+        const bill = await exports.prisma.bill.findUnique({
+            where: { billNo },
+            include: {
+                customer: true,
+                store: true,
+                billDetails: true,
+            },
+        });
+        if (!bill) {
+            res.status(404).json({ error: "Bill not found" });
+            return;
+        }
+        res.status(200).json(bill);
+    }
+    catch (error) {
+        console.error("Error fetching bill details:", error);
+        res.status(500).json({ error: "Failed to fetch bill details" });
+    }
+};
+exports.getBillDetailsByBillNo = getBillDetailsByBillNo;
 //# sourceMappingURL=reportController.js.map

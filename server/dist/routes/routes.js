@@ -10,5 +10,6 @@ router.get("/customer-report", reportController_1.getCustomerReport);
 router.get("/store-sales-report", reportController_1.getStoreWiseSalesReport);
 router.get("/customers", reportController_1.getAllCustomers);
 router.get("/inactive-customers", reportController_1.getInactiveCustomers);
+router.get("/bills/:billNo", reportController_1.getBillDetailsByBillNo);
 exports.default = router;
 //# sourceMappingURL=routes.js.map

@@ -7,9 +7,15 @@ async function clearDatabase() {
         console.log('Clearing database...');
         await prisma.billDetails.deleteMany();
         await prisma.bill.deleteMany();
+        await prisma.telecallingOrderDetails.deleteMany();
+        await prisma.telecallingOrder.deleteMany();
+        await prisma.telecallerHandledCustomer.deleteMany();
+        await prisma.telecallingCustomer.deleteMany();
+        await prisma.uploadHistory.deleteMany();
         await prisma.customer.deleteMany();
         await prisma.store.deleteMany();
-        await prisma.uploadHistory.deleteMany();
+        await prisma.product.deleteMany();
+        await prisma.user.deleteMany();
         console.log('Database cleared successfully.');
     }
     catch (error) {

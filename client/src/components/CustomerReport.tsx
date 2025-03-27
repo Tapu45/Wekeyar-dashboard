@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api, { API_ROUTES } from "../utils/api";
 import { motion, AnimatePresence } from "framer-motion";
-import { CustomerReportData, MedicineDetails } from "../utils/types";
+import { CustomerReportData} from "../utils/types";
 import { ChevronDown, ChevronUp, Calendar, Search, ShoppingBag, CreditCard, User, Phone, Receipt, Clock } from "lucide-react";
 
 

@@ -5,12 +5,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CustomerReportData, MedicineDetails } from "../utils/types";
 import { ChevronDown, ChevronUp, Calendar, Search, ShoppingBag, CreditCard, User, Phone, Receipt, Clock } from "lucide-react";
 
+
 const fetchCustomerReport = async (startDate: string, endDate: string, search?: string): Promise<CustomerReportData[]> => {
   const { data } = await api.get(API_ROUTES.CUSTOMER_REPORT, {
     params: { startDate, endDate, search },
-  });
+  });  
   return data;
 };
+
+
+
 
 const CustomerReportPage: React.FC = () => {
   const [startDate, setStartDate] = useState("");
@@ -155,87 +159,87 @@ const CustomerReportPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {data.map((customer: CustomerReportData, customerIndex: number) => (
-                  <React.Fragment key={customerIndex}>
-                    <tr
-                      className={`
-                        hover:bg-blue-50 transition-colors duration-150
-                        ${customerIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                        ${expandedCustomer === customerIndex ? "bg-blue-50" : ""}
-                      `}
-                      onClick={() => toggleExpand(customerIndex)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <td className="p-4 border-t border-gray-200 font-medium">{customer.customerName}</td>
-                      <td className="p-4 border-t border-gray-200">{customer.mobileNo}</td>
-                      <td className="p-4 border-t border-gray-200 text-right">{customer.totalProducts}</td>
-                      <td className="p-4 border-t border-gray-200 text-right font-medium text-blue-600">
-                        ₹{customer.totalSales.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                      </td>
-                      <td className="p-4 border-t border-gray-200 text-center">
-                        <button className="text-blue-600 hover:text-blue-800 transition-colors duration-150">
-                          {expandedCustomer === customerIndex ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                        </button>
-                      </td>
-                    </tr>
-                    <AnimatePresence>
-                      {expandedCustomer === customerIndex && (
-                        <motion.tr
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.3 }}
-                        >
-                          <td colSpan={5} className="p-0 border-t-0">
-                            <motion.div 
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ duration: 0.3, delay: 0.1 }}
-                              className="p-6 bg-blue-50 border-t border-b border-blue-100"
-                            >
-                              <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-                                <ShoppingBag size={18} className="mr-2 text-blue-600" />
-                                Medicine Details
-                              </h4>
-                              <div className="bg-white rounded-lg shadow-sm">
-                                <div className="grid grid-cols-5 p-3 bg-gray-100 font-medium text-gray-700 border-b border-gray-200">
-                                  <div className="col-span-2">Medicine Name</div>
-                                  <div className="col-span-1 flex items-center gap-1">
-                                    <Receipt size={14} />
-                                    <span>Bill No</span>
-                                  </div>
-                                  <div className="col-span-1 flex items-center gap-1">
-                                    <Clock size={14} />
-                                    <span>Date</span>
-                                  </div>
-                                  <div className="col-span-1 text-center">Quantity</div>
-                                </div>
-                                {customer.bills[0]?.medicines.map((medicine: MedicineDetails, index: number) => (
-                                  <div
-                                    key={index}
-                                    className={`grid grid-cols-5 items-center p-4 ${
-                                      index !== customer.bills[0].medicines.length - 1 ? "border-b border-gray-200" : ""
-                                    }`}
-                                  >
-                                    <div className="col-span-2 font-medium text-gray-800">{medicine.name}</div>
-                                    <div className="col-span-1 text-gray-600">{customer.bills[0]?.billNo}</div>
-                                    <div className="col-span-1 text-gray-600">{new Date(customer.bills[0]?.date).toLocaleDateString()}</div>
-                                    <div className="col-span-1 text-center">
-                                      <span className="font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                                        {medicine.quantity}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </motion.div>
-                          </td>
-                        </motion.tr>
-                      )}
-                    </AnimatePresence>
-                  </React.Fragment>
+  {data.map((customer: CustomerReportData, customerIndex: number) => (
+    <React.Fragment key={customerIndex}>
+      <tr
+        className={`hover:bg-blue-50 transition-colors duration-150 ${
+          customerIndex % 2 === 0 ? "bg-white" : "bg-gray-50"
+        } ${expandedCustomer === customerIndex ? "bg-blue-50" : ""}`}
+        onClick={() => toggleExpand(customerIndex)}
+        style={{ cursor: "pointer" }}
+      >
+        <td className="p-4 border-t border-gray-200 font-medium">{customer.customerName}</td>
+        <td className="p-4 border-t border-gray-200">{customer.mobileNo}</td>
+        <td className="p-4 border-t border-gray-200 text-right">{customer.totalProducts}</td>
+        <td className="p-4 border-t border-gray-200 text-right font-medium text-blue-600">
+          ₹{customer.totalSales.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+        </td>
+        <td className="p-4 border-t border-gray-200 text-center">
+          <button className="text-blue-600 hover:text-blue-800 transition-colors duration-150">
+            {expandedCustomer === customerIndex ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          </button>
+        </td>
+      </tr>
+      <AnimatePresence>
+        {expandedCustomer === customerIndex && (
+          <motion.tr
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <td colSpan={5} className="p-0 border-t-0">
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.1 }}
+                className="p-6 bg-blue-50 border-t border-b border-blue-100"
+              >
+                <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                  <ShoppingBag size={18} className="mr-2 text-blue-600" />
+                  Medicine Details
+                </h4>
+                {customer.bills.map((bill, billIndex) => (
+                  <div key={billIndex} className="bg-white rounded-lg shadow-sm mb-4">
+                    <div className="grid grid-cols-5 p-3 bg-gray-100 font-medium text-gray-700 border-b border-gray-200">
+                      <div className="col-span-2">Medicine Name</div>
+                      <div className="col-span-1 flex items-center gap-1">
+                        <Receipt size={14} />
+                        <span>Bill No</span>
+                      </div>
+                      <div className="col-span-1 flex items-center gap-1">
+                        <Clock size={14} />
+                        <span>Date</span>
+                      </div>
+                      <div className="col-span-1 text-center">Quantity</div>
+                    </div>
+                    {bill.medicines.map((medicine, medicineIndex) => (
+                      <div
+                        key={medicineIndex}
+                        className={`grid grid-cols-5 items-center p-4 ${
+                          medicineIndex !== bill.medicines.length - 1 ? "border-b border-gray-200" : ""
+                        }`}
+                      >
+                        <div className="col-span-2 font-medium text-gray-800">{medicine.name}</div>
+                        <div className="col-span-1 text-gray-600">{bill.billNo}</div>
+                        <div className="col-span-1 text-gray-600">{new Date(bill.date).toLocaleDateString()}</div>
+                        <div className="col-span-1 text-center">
+                          <span className="font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                            {medicine.quantity}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ))}
-              </tbody>
+              </motion.div>
+            </td>
+          </motion.tr>
+        )}
+      </AnimatePresence>
+    </React.Fragment>
+  ))}
+</tbody>
             </table>
           </div>
         ) : (

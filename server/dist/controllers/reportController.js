@@ -182,6 +182,9 @@ const getCustomerReport = async (req, res) => {
                 customer: true,
                 billDetails: true,
             },
+            orderBy: {
+                date: "desc",
+            },
         });
         const customerData = new Map();
         bills.forEach((bill) => {

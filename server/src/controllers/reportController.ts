@@ -246,7 +246,10 @@ export const getCustomerReport = async (
       where: whereCondition,
       include: {
         customer: true,
-        billDetails: true, // Include medicine details
+        billDetails: true, // Include bill details
+      },
+      orderBy: {
+        date: "desc", // Ensure bills are ordered by date
       },
     });
 

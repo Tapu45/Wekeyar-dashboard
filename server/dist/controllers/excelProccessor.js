@@ -205,6 +205,9 @@ async function processExcelFile() {
             let quantity = 1;
             let batch = "";
             let mrp = 0;
+            if (rowArray[2] && !isNaN(parseFloat(rowArray[2]))) {
+                quantity = parseInt(parseFloat(rowArray[2]));
+            }
             for (const value of rowArray) {
                 if (!value)
                     continue;
@@ -212,11 +215,8 @@ async function processExcelFile() {
                 if (strValue.length > 5 && /[A-Z\-]/.test(strValue) && !/^\d/.test(strValue)) {
                     name = strValue;
                 }
-                if (/^\d+\.0+$/.test(strValue)) {
+                if (/^\d+\.?\d*$/.test(strValue) && parseInt(strValue) < 100) {
                     quantity = parseInt(parseFloat(strValue));
-                }
-                else if (/^\d+$/.test(strValue) && parseInt(strValue) < 100) {
-                    quantity = parseInt(strValue);
                 }
                 if (/^\d+\/\d+\s+\w+/.test(strValue)) {
                     batch = strValue;

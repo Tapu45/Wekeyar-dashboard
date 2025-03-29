@@ -345,6 +345,7 @@ export const getStoreWiseSalesReport = async (
         select: {
           netAmount: true,
           isUploaded: true,
+          createdAt: true, // Fetch the creation date for upload tracking
           billDetails: {
             select: {
               id: true, // Counting items sold
@@ -352,6 +353,11 @@ export const getStoreWiseSalesReport = async (
           },
         },
       });
+
+      // Find the last upload date
+      const lastUploadDate = sales.length > 0
+        ? sales.reduce((latest, bill) => (bill.createdAt > latest ? bill.createdAt : latest), sales[0].createdAt)
+        : null;
 
       return {
         totalNetAmount: sales.reduce((sum, bill) => sum + bill.netAmount, 0),
@@ -361,6 +367,7 @@ export const getStoreWiseSalesReport = async (
           0
         ),
         isUploaded: sales.length > 0 ? sales[0].isUploaded : false,
+        lastUploadDate: lastUploadDate ? lastUploadDate.toISOString() : null, // Format the date
       };
     };
 
@@ -381,6 +388,7 @@ export const getStoreWiseSalesReport = async (
             totalBills: currentSales.totalBills,
             totalItemsSold: currentSales.totalItemsSold,
             isUploaded: currentSales.isUploaded,
+            lastUploadDate: currentSales.lastUploadDate, // Include the last upload date
           },
           trends: {
             previousDay: previousDaySales,

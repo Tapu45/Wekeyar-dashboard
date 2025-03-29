@@ -250,6 +250,7 @@ const getStoreWiseSalesReport = async (req, res) => {
                 select: {
                     netAmount: true,
                     isUploaded: true,
+                    createdAt: true,
                     billDetails: {
                         select: {
                             id: true,
@@ -257,11 +258,15 @@ const getStoreWiseSalesReport = async (req, res) => {
                     },
                 },
             });
+            const lastUploadDate = sales.length > 0
+                ? sales.reduce((latest, bill) => (bill.createdAt > latest ? bill.createdAt : latest), sales[0].createdAt)
+                : null;
             return {
                 totalNetAmount: sales.reduce((sum, bill) => sum + bill.netAmount, 0),
                 totalBills: sales.length,
                 totalItemsSold: sales.reduce((sum, bill) => sum + bill.billDetails.length, 0),
                 isUploaded: sales.length > 0 ? sales[0].isUploaded : false,
+                lastUploadDate: lastUploadDate ? lastUploadDate.toISOString() : null,
             };
         };
         const storeReports = await Promise.all(stores.map(async (store) => {
@@ -278,6 +283,7 @@ const getStoreWiseSalesReport = async (req, res) => {
                     totalBills: currentSales.totalBills,
                     totalItemsSold: currentSales.totalItemsSold,
                     isUploaded: currentSales.isUploaded,
+                    lastUploadDate: currentSales.lastUploadDate,
                 },
                 trends: {
                     previousDay: previousDaySales,

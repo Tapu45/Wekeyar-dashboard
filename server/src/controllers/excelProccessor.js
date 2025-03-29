@@ -251,6 +251,11 @@ const DEFAULT_NAME = "Cashlist Customer";
       let batch = "";
       let mrp = 0;
       
+      // Look for quantity in the correct column (appears to be column 3 in your spreadsheet)
+      if (rowArray[2] && !isNaN(parseFloat(rowArray[2]))) {
+        quantity = parseInt(parseFloat(rowArray[2]));
+      }
+      
       for (const value of rowArray) {
         if (!value) continue;
         const strValue = String(value).trim();
@@ -259,11 +264,10 @@ const DEFAULT_NAME = "Cashlist Customer";
           name = strValue;
         }
         
-        // Improved quantity parsing
-        if (/^\d+\.0+$/.test(strValue)) {
+        // Improved quantity parsing - needs to look in the correct column
+        // This approach may need to be adjusted based on the exact structure
+        if (/^\d+\.?\d*$/.test(strValue) && parseInt(strValue) < 100) {
           quantity = parseInt(parseFloat(strValue));
-        } else if (/^\d+$/.test(strValue) && parseInt(strValue) < 100) {
-          quantity = parseInt(strValue);
         }
         
         if (/^\d+\/\d+\s+\w+/.test(strValue)) {

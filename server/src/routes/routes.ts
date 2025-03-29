@@ -10,6 +10,7 @@ import {
   getAllCustomers,
   getInactiveCustomers,
   getBillDetailsByBillNo,
+  getUploadStatusByMonth,
 } from "../controllers/reportController";
 
 router.get("/summary", getSummary);
@@ -20,5 +21,6 @@ router.get("/store-sales-report", getStoreWiseSalesReport);
 router.get("/customers", getAllCustomers);
 router.get("/inactive-customers", getInactiveCustomers);
 router.get("/bills/:billNo", getBillDetailsByBillNo);
+router.get("/upload-status", getUploadStatusByMonth);
 
 export default router;

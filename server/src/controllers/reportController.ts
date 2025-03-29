@@ -609,4 +609,91 @@ export const getBillDetailsByBillNo = async (req: Request, res: Response): Promi
   }
 };
 
+export const getUploadStatusByMonth = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { year, month, storeId, storeName } = req.query;
+
+    // Validate input
+    if (!year || !month) {
+      res.status(400).json({ error: "Year and month are required." });
+      return;
+    }
+
+    const yearInt = parseInt(year as string, 10);
+    const monthInt = parseInt(month as string, 10);
+
+    if (isNaN(yearInt) || isNaN(monthInt) || monthInt < 1 || monthInt > 12) {
+      res.status(400).json({ error: "Invalid year or month." });
+      return;
+    }
+
+    // Calculate the start and end dates of the selected month
+    const startDate = new Date(Date.UTC(yearInt, monthInt - 1, 1)); // Start of the month (UTC)
+    const endDate = new Date(Date.UTC(yearInt, monthInt, 0, 23, 59, 59)); // End of the month (UTC)
+
+    let storeFilter: number | undefined = undefined;
+
+    // Handle storeName or storeId
+    if (storeName) {
+      const store = await prisma.store.findFirst({
+        where: { 
+          storeName: { equals: storeName as string, mode: "insensitive" } // Case-insensitive match
+        },
+        select: { id: true },
+      });
+    
+      if (!store) {
+        res.status(404).json({ error: "Store not found." });
+        return;
+      }
+    
+      storeFilter = store.id; // Use the store ID from the store name
+    } else if (storeId) {
+      storeFilter = parseInt(storeId as string, 10);
+
+      if (isNaN(storeFilter)) {
+        res.status(400).json({ error: "Invalid store ID." });
+        return;
+      }
+    }
+
+    // Fetch bills for the selected store and date range
+    const bills = await prisma.bill.findMany({
+      where: {
+        storeId: storeFilter, // Use the store filter if provided
+        date: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      select: {
+        date: true,
+      },
+    });
+
+    // Create a map of dates with upload status
+    const uploadStatusMap: { [key: string]: boolean } = {};
+    bills.forEach((bill) => {
+      const dateKey = bill.date.toISOString().split("T")[0]; // Format as YYYY-MM-DD
+      uploadStatusMap[dateKey] = true;
+    });
+
+    // Generate the response for each day of the month
+    const daysInMonth = new Date(yearInt, monthInt, 0).getDate();
+    const result = Array.from({ length: daysInMonth }, (_, i) => {
+      const date = new Date(Date.UTC(yearInt, monthInt - 1, i + 1)); // Ensure UTC date
+      const dateKey = date.toISOString().split("T")[0];
+      return {
+        date: dateKey,
+        isUploaded: uploadStatusMap[dateKey] || false,
+      };
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching upload status:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 

@@ -20,12 +20,12 @@ import UserCreationPage from "./components/UserCreation";
 import Tellecalling from "./components/tellecalling";
 import TelecallingDashboard from "./components/TelecallingDashboard";
 import TelecallerRemarksOrders from "./components/TelecallerHistory";
+import UploadStatusPage from "./components/UploadStatusPage";
 
 const queryClient = new QueryClient();
 
 const App: React.FC = () => {
   return (
-    
     <QueryClientProvider client={queryClient}>
       <Router>
         <Routes>
@@ -100,18 +100,26 @@ const App: React.FC = () => {
               }
             />
             <Route
-  path="telecaller-remarks-orders"
-  element={
-    <ProtectedRoute allowedRoles={["tellecaller"]}>
-      <TelecallerRemarksOrders />
-    </ProtectedRoute>
-  }
-/>
+              path="telecaller-remarks-orders"
+              element={
+                <ProtectedRoute allowedRoles={["tellecaller"]}>
+                  <TelecallerRemarksOrders />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="upload"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <UploadPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="upload-status"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <UploadStatusPage />
                 </ProtectedRoute>
               }
             />
@@ -132,13 +140,13 @@ const App: React.FC = () => {
               }
             />
             <Route
-  path="telecalling-dashboard"
-  element={
-    <ProtectedRoute allowedRoles={["admin"]}>
-      <TelecallingDashboard />
-    </ProtectedRoute>
-  }
-/>
+              path="telecalling-dashboard"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <TelecallingDashboard />
+                </ProtectedRoute>
+              }
+            />
           </Route>
 
           {/* Catch all route */}
@@ -146,7 +154,6 @@ const App: React.FC = () => {
         </Routes>
       </Router>
     </QueryClientProvider>
-    
   );
 };
 

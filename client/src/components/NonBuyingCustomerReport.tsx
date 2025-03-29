@@ -42,20 +42,46 @@ const NonBuyingCustomerReport: React.FC = () => {
 
   if (isLoading) {
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden bg-white shadow-xl rounded-xl">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="overflow-hidden bg-white shadow-xl rounded-xl"
+      >
+        {/* Header Section */}
         <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-800">
           <h2 className="text-2xl font-bold text-white">Non-Buying Customers</h2>
-          <p className="text-blue-100">Loading customer data...</p>
+          <p className="text-blue-100">Identify customers who haven't made purchases recently</p>
         </div>
-        <div className="flex items-center justify-center h-64">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 border-4 border-blue-200 rounded-full border-t-blue-600 animate-spin"></div>
-            <p className="font-medium text-blue-600">Loading customer data...</p>
+
+        {/* Loading Spinner */}
+        <div className="flex flex-col items-center justify-center h-64 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg shadow-lg border border-blue-200">
+          <div className="relative">
+            {/* Outer rotating ring */}
+            <motion.div
+              className="w-20 h-20 border-4 border-blue-300 border-t-transparent rounded-full"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+            />
+            {/* Inner pulsating circle */}
+            <motion.div
+              className="absolute top-2 left-2 w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-700 rounded-full"
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+            />
           </div>
+          <motion.p
+            className="mt-6 text-blue-800 font-semibold text-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            Fetching Non Buying Customer data, please wait...
+          </motion.p>
         </div>
       </motion.div>
     );
   }
+
 
   if (error)
     return (

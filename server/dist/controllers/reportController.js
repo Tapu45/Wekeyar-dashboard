@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getBillDetailsByBillNo = exports.getInactiveCustomers = exports.getAllCustomers = exports.getStoreWiseSalesReport = exports.getCustomerReport = exports.getNonBuyingMonthlyCustomers = exports.getNonBuyingCustomers = exports.getSummary = exports.prisma = void 0;
+exports.getUploadStatusByMonth = exports.getBillDetailsByBillNo = exports.getInactiveCustomers = exports.getAllCustomers = exports.getStoreWiseSalesReport = exports.getCustomerReport = exports.getNonBuyingMonthlyCustomers = exports.getNonBuyingCustomers = exports.getSummary = exports.prisma = void 0;
 const client_1 = require("@prisma/client");
 const date_fns_1 = require("date-fns");
 exports.prisma = new client_1.PrismaClient();
@@ -446,4 +446,74 @@ const getBillDetailsByBillNo = async (req, res) => {
     }
 };
 exports.getBillDetailsByBillNo = getBillDetailsByBillNo;
+const getUploadStatusByMonth = async (req, res) => {
+    try {
+        const { year, month, storeId, storeName } = req.query;
+        if (!year || !month) {
+            res.status(400).json({ error: "Year and month are required." });
+            return;
+        }
+        const yearInt = parseInt(year, 10);
+        const monthInt = parseInt(month, 10);
+        if (isNaN(yearInt) || isNaN(monthInt) || monthInt < 1 || monthInt > 12) {
+            res.status(400).json({ error: "Invalid year or month." });
+            return;
+        }
+        const startDate = new Date(Date.UTC(yearInt, monthInt - 1, 1));
+        const endDate = new Date(Date.UTC(yearInt, monthInt, 0, 23, 59, 59));
+        let storeFilter = undefined;
+        if (storeName) {
+            const store = await exports.prisma.store.findFirst({
+                where: {
+                    storeName: { equals: storeName, mode: "insensitive" }
+                },
+                select: { id: true },
+            });
+            if (!store) {
+                res.status(404).json({ error: "Store not found." });
+                return;
+            }
+            storeFilter = store.id;
+        }
+        else if (storeId) {
+            storeFilter = parseInt(storeId, 10);
+            if (isNaN(storeFilter)) {
+                res.status(400).json({ error: "Invalid store ID." });
+                return;
+            }
+        }
+        const bills = await exports.prisma.bill.findMany({
+            where: {
+                storeId: storeFilter,
+                date: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+            },
+            select: {
+                date: true,
+            },
+        });
+        const uploadStatusMap = {};
+        bills.forEach((bill) => {
+            const dateKey = bill.date.toISOString().split("T")[0];
+            uploadStatusMap[dateKey] = true;
+        });
+        const daysInMonth = new Date(yearInt, monthInt, 0).getDate();
+        const result = Array.from({ length: daysInMonth }, (_, i) => {
+            const date = new Date(Date.UTC(yearInt, monthInt - 1, i + 1));
+            const dateKey = date.toISOString().split("T")[0];
+            return {
+                date: dateKey,
+                isUploaded: uploadStatusMap[dateKey] || false,
+            };
+        });
+        res.status(200).json(result);
+    }
+    catch (error) {
+        console.error("Error fetching upload status:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+};
+exports.getUploadStatusByMonth = getUploadStatusByMonth;
 //# sourceMappingURL=reportController.js.map

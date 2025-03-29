@@ -8,7 +8,7 @@ import { ChevronDown, ChevronUp, Calendar, Search, ShoppingBag, CreditCard, User
 
 const fetchCustomerReport = async (startDate: string, endDate: string, search?: string): Promise<CustomerReportData[]> => {
   const { data } = await api.get(API_ROUTES.CUSTOMER_REPORT, {
-    params: { startDate, endDate, search },
+    params: { startDate, endDate, search},
   });  
   return data;
 };

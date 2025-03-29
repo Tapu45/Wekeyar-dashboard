@@ -7,11 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
 model Customer {
   id        Int      @id @default(autoincrement())
   name      String
   phone     String   @unique
   address   String? // Optional address
+  isCashlist  Boolean  @default(false)
   bills     Bill[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

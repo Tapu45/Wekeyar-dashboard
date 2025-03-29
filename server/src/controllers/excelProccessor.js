@@ -42,6 +42,9 @@ async function executeWithRetry(operation, maxRetries = 3) {
 }
 
 async function processExcelFile() {
+
+  const DEFAULT_PHONE = "9999999999";
+const DEFAULT_NAME = "Cashlist Customer";
   
   let currentProgress = 0;
   try {
@@ -175,11 +178,12 @@ async function processExcelFile() {
         if (match) {
           return {
             phone: match[1],
-            customerName: match[2].trim()
+            customerName: match[2].trim(),
+            isCashlist: false
           };
         }
       }
-      return { phone: "unknown", customerName: "Unknown" };
+      return { phone: DEFAULT_PHONE, customerName: DEFAULT_NAME, isCashlist: true };
     }
     
     function extractDate(rowArray) {
@@ -255,8 +259,11 @@ async function processExcelFile() {
           name = strValue;
         }
         
-        if (/^\d+\.0$/.test(strValue)) {
-          quantity = parseFloat(strValue);
+        // Improved quantity parsing
+        if (/^\d+\.0+$/.test(strValue)) {
+          quantity = parseInt(parseFloat(strValue));
+        } else if (/^\d+$/.test(strValue) && parseInt(strValue) < 100) {
+          quantity = parseInt(strValue);
         }
         
         if (/^\d+\/\d+\s+\w+/.test(strValue)) {
@@ -450,6 +457,23 @@ async function processExcelFile() {
             }
           }
         }
+        if (i + 1 < sheetRows.length) {
+          const nextRow = sheetRows[i + 1];
+          if (!isItemRow(nextRow) && !isBillNumberRow(nextRow)) {
+            // This appears to be the end of the current customer section
+            // Save the current bills
+            billRecords.push(...currentCustomerBills);
+            currentCustomerBills = [];
+      
+            // Reset the current customer to a cash customer for any bills without a clear owner
+            currentCustomer = {
+              phone: DEFAULT_PHONE,
+              name: DEFAULT_NAME,
+              date: new Date(),
+              isCashlist: true
+            };
+          }
+        }
       }
       // Special handling for tables with multiple bills
       else if (rowArray && currentCustomerBills.length > 0) {
@@ -540,7 +564,8 @@ async function processExcelFile() {
     const customerData = Array.from(uniqueCustomers).map(([phone, name]) => ({
       phone,
       name,
-      address: null
+      address: null,
+      isCashlist: phone === DEFAULT_PHONE
     }));
     
     // Create customers in smaller batches

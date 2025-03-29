@@ -37,6 +37,8 @@ async function executeWithRetry(operation, maxRetries = 3) {
     throw lastError;
 }
 async function processExcelFile() {
+    const DEFAULT_PHONE = "9999999999";
+    const DEFAULT_NAME = "Cashlist Customer";
     let currentProgress = 0;
     try {
         const { fileUrl } = workerData;
@@ -138,11 +140,12 @@ async function processExcelFile() {
                 if (match) {
                     return {
                         phone: match[1],
-                        customerName: match[2].trim()
+                        customerName: match[2].trim(),
+                        isCashlist: false
                     };
                 }
             }
-            return { phone: "unknown", customerName: "Unknown" };
+            return { phone: DEFAULT_PHONE, customerName: DEFAULT_NAME, isCashlist: true };
         }
         function extractDate(rowArray) {
             for (const value of rowArray) {
@@ -209,8 +212,11 @@ async function processExcelFile() {
                 if (strValue.length > 5 && /[A-Z\-]/.test(strValue) && !/^\d/.test(strValue)) {
                     name = strValue;
                 }
-                if (/^\d+\.0$/.test(strValue)) {
-                    quantity = parseFloat(strValue);
+                if (/^\d+\.0+$/.test(strValue)) {
+                    quantity = parseInt(parseFloat(strValue));
+                }
+                else if (/^\d+$/.test(strValue) && parseInt(strValue) < 100) {
+                    quantity = parseInt(strValue);
                 }
                 if (/^\d+\/\d+\s+\w+/.test(strValue)) {
                     batch = strValue;
@@ -359,6 +365,19 @@ async function processExcelFile() {
                         }
                     }
                 }
+                if (i + 1 < sheetRows.length) {
+                    const nextRow = sheetRows[i + 1];
+                    if (!isItemRow(nextRow) && !isBillNumberRow(nextRow)) {
+                        billRecords.push(...currentCustomerBills);
+                        currentCustomerBills = [];
+                        currentCustomer = {
+                            phone: DEFAULT_PHONE,
+                            name: DEFAULT_NAME,
+                            date: new Date(),
+                            isCashlist: true
+                        };
+                    }
+                }
             }
             else if (rowArray && currentCustomerBills.length > 0) {
                 let billNo = null;
@@ -429,7 +448,8 @@ async function processExcelFile() {
         const customerData = Array.from(uniqueCustomers).map(([phone, name]) => ({
             phone,
             name,
-            address: null
+            address: null,
+            isCashlist: phone === DEFAULT_PHONE
         }));
         const customerBatches = [];
         for (let i = 0; i < customerData.length; i += BATCH_SIZE) {

@@ -302,10 +302,11 @@ async function processExcelFile() {
             }
             else if (currentCustomer && isBillNumberRow(rowArray)) {
                 const billNo = extractBillNumber(rowArray);
-                let billDate = currentCustomer.date;
+                let billDate = lastValidDate;
                 for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
                     if (isDateRow(sheetRows[j])) {
                         billDate = extractDate(sheetRows[j]);
+                        lastValidDate = billDate;
                         break;
                     }
                 }

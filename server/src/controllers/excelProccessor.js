@@ -473,7 +473,7 @@ const DEFAULT_NAME = "Cashlist Customer";
             currentCustomer = {
               phone: DEFAULT_PHONE,
               name: DEFAULT_NAME,
-              date: new Date(),
+              date: lastValidDate,
               isCashlist: true
             };
           }

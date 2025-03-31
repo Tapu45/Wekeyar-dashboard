@@ -373,7 +373,7 @@ async function processExcelFile() {
                         currentCustomer = {
                             phone: DEFAULT_PHONE,
                             name: DEFAULT_NAME,
-                            date: new Date(),
+                            date: lastValidDate,
                             isCashlist: true
                         };
                     }

@@ -68,7 +68,6 @@ async function processExcelFile() {
         let rowCount = 0;
         let processedRows = 0;
         let lastProgressUpdate = 0;
-        let currentCustomerStartRow = 0;
         const workbook = new ExcelJS.Workbook();
         console.time('Excel parsing');
         await workbook.xlsx.read(response.data);
@@ -300,49 +299,32 @@ async function processExcelFile() {
                     name: customerInfo.customerName,
                     date: date
                 };
-                currentCustomerStartRow = i;
             }
             else if (currentCustomer && isBillNumberRow(rowArray)) {
                 const billNo = extractBillNumber(rowArray);
-                let belongsToCurrentCustomer = true;
-                if (i - currentCustomerStartRow > 10) {
-                    for (let j = Math.max(currentCustomerStartRow + 1, i - 10); j < i; j++) {
-                        if (isCustomerHeader(sheetRows[j]) && !isDateRow(sheetRows[j])) {
-                            belongsToCurrentCustomer = false;
-                            i = j - 1;
-                            if (currentCustomerBills.length > 0) {
-                                billRecords.push(...currentCustomerBills);
-                                currentCustomerBills = [];
-                            }
-                            break;
-                        }
+                let billDate = lastValidDate;
+                for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
+                    if (isDateRow(sheetRows[j])) {
+                        billDate = extractDate(sheetRows[j]);
+                        lastValidDate = billDate;
+                        break;
                     }
                 }
-                if (belongsToCurrentCustomer) {
-                    let billDate = lastValidDate;
-                    for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
-                        if (isDateRow(sheetRows[j])) {
-                            billDate = extractDate(sheetRows[j]);
-                            lastValidDate = billDate;
-                            break;
-                        }
-                    }
-                    const newBill = {
-                        billNo: billNo,
-                        customerPhone: currentCustomer.phone,
-                        customerName: currentCustomer.name,
-                        date: billDate,
-                        items: [],
-                        totalAmount: 0,
-                        cash: 0,
-                        credit: 0
-                    };
-                    const payments = extractCashAndCredit(rowArray, billNo);
-                    newBill.cash = payments.cash;
-                    newBill.credit = payments.credit;
-                    currentCustomerBills.push(newBill);
-                    currentBill = newBill;
-                }
+                const newBill = {
+                    billNo: billNo,
+                    customerPhone: currentCustomer.phone,
+                    customerName: currentCustomer.name,
+                    date: billDate,
+                    items: [],
+                    totalAmount: 0,
+                    cash: 0,
+                    credit: 0
+                };
+                const payments = extractCashAndCredit(rowArray, billNo);
+                newBill.cash = payments.cash;
+                newBill.credit = payments.credit;
+                currentCustomerBills.push(newBill);
+                currentBill = newBill;
             }
             else if (currentBill && isItemRow(rowArray)) {
                 const item = extractItemDetails(rowArray);
@@ -386,48 +368,36 @@ async function processExcelFile() {
                 }
                 if (i + 1 < sheetRows.length) {
                     const nextRow = sheetRows[i + 1];
-                    let foundNextCustomer = false;
-                    for (let j = i + 1; j < Math.min(i + 10, sheetRows.length); j++) {
-                        if (isCustomerHeader(sheetRows[j])) {
-                            foundNextCustomer = true;
-                            break;
-                        }
-                    }
-                    if (foundNextCustomer && !isItemRow(nextRow) && !isBillNumberRow(nextRow)) {
+                    if (!isItemRow(nextRow) && !isBillNumberRow(nextRow)) {
                         billRecords.push(...currentCustomerBills);
                         currentCustomerBills = [];
-                        currentBill = null;
+                        currentCustomer = {
+                            phone: DEFAULT_PHONE,
+                            name: DEFAULT_NAME,
+                            date: lastValidDate,
+                            isCashlist: true
+                        };
                     }
                 }
             }
-            if (currentCustomer && i - currentCustomerStartRow > 5) {
-                if (rowArray.length > 0 &&
-                    !isItemRow(rowArray) &&
-                    !isBillNumberRow(rowArray) &&
-                    !isBillTotal(rowArray)) {
-                    let billCount = 0;
-                    for (const value of rowArray) {
-                        if (!value)
-                            continue;
-                        const strValue = String(value).trim();
-                        if (/^(CS|CN)\/\d+$/.test(strValue)) {
-                            billCount++;
-                        }
+            else if (rowArray && currentCustomerBills.length > 0) {
+                let billNo = null;
+                for (const value of rowArray) {
+                    if (!value)
+                        continue;
+                    const strValue = String(value).trim();
+                    if (/^(CS|CN)\/\d+$/.test(strValue)) {
+                        billNo = strValue;
+                        break;
                     }
-                    if (billCount > 1) {
-                        let foundCustomerAhead = false;
-                        for (let j = i + 1; j < Math.min(i + 3, sheetRows.length); j++) {
-                            if (isCustomerHeader(sheetRows[j])) {
-                                foundCustomerAhead = true;
-                                break;
-                            }
-                        }
-                        if (foundCustomerAhead) {
-                            if (currentCustomerBills.length > 0) {
-                                billRecords.push(...currentCustomerBills);
-                                currentCustomerBills = [];
-                                currentBill = null;
-                            }
+                }
+                if (billNo) {
+                    const billIndex = currentCustomerBills.findIndex(bill => bill.billNo === billNo);
+                    if (billIndex >= 0) {
+                        const payments = extractCashAndCredit(rowArray, billNo);
+                        if (payments.cash > 0 || payments.credit !== 0) {
+                            currentCustomerBills[billIndex].cash = payments.cash;
+                            currentCustomerBills[billIndex].credit = payments.credit;
                         }
                     }
                 }

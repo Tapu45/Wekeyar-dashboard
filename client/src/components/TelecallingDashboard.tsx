@@ -11,11 +11,15 @@ import {
   Loader
 } from "lucide-react";
 
-interface TelecallingOrder {
-  id: number;
+interface OrderDetail {
   productName: string;
   quantity: number;
   isNewProduct: boolean;
+}
+
+interface TelecallingOrder {
+  id: number;
+  orderDetails: OrderDetail[];
   orderDate: string;
   telecallingCustomer: {
     id: number;
@@ -62,6 +66,9 @@ const TelecallingDashboard: React.FC = () => {
     newProducts: true,
     telecallers: true
   });
+  
+  // For showing/hiding order details
+  const [expandedOrders, setExpandedOrders] = useState<number[]>([]);
 
   // For sorting functionality
   const [sortConfig, setSortConfig] = useState<{
@@ -99,6 +106,14 @@ const TelecallingDashboard: React.FC = () => {
       ...expandedSections,
       [section]: !expandedSections[section]
     });
+  };
+
+  const toggleOrderDetails = (orderId: number) => {
+    setExpandedOrders(prev => 
+      prev.includes(orderId) 
+        ? prev.filter(id => id !== orderId)
+        : [...prev, orderId]
+    );
   };
 
   const requestSort = (key: string) => {
@@ -195,41 +210,93 @@ const TelecallingDashboard: React.FC = () => {
                     <thead>
                       <tr className="bg-blue-50">
                         <ThHeader label="Order ID" sortKey="id" />
-                        <ThHeader label="Product Name" sortKey="productName" />
-                        <ThHeader label="Quantity" sortKey="quantity" />
+                        <ThHeader label="Products" sortKey="productName" />
                         <ThHeader label="Customer Name" sortKey="telecallingCustomer.customerName" />
                         <ThHeader label="Telecaller" sortKey="telecaller.username" />
                         <ThHeader label="Order Date" sortKey="orderDate" />
+                        <th className="border-b border-blue-200 px-4 py-3 text-left font-semibold">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {sortedOrders.map((order) => (
-                        <tr key={order.id} className="hover:bg-blue-50 transition-colors">
-                          <td className="border-b border-blue-100 px-4 py-3 text-blue-700 font-medium">#{order.id}</td>
-                          <td className="border-b border-blue-100 px-4 py-3">
-                            <div className="flex items-center">
-                              <Package size={16} className="text-blue-500 mr-2" />
-                              {order.productName}
-                              {order.isNewProduct && (
-                                <span className="ml-2 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">New</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="border-b border-blue-100 px-4 py-3">{order.quantity}</td>
-                          <td className="border-b border-blue-100 px-4 py-3">
-                            <div className="flex items-center">
-                              <User size={16} className="text-blue-500 mr-2" />
-                              {order.telecallingCustomer.customerName}
-                            </div>
-                          </td>
-                          <td className="border-b border-blue-100 px-4 py-3">{order.telecaller.username}</td>
-                          <td className="border-b border-blue-100 px-4 py-3">
-                            <div className="flex items-center">
-                              <Calendar size={16} className="text-blue-500 mr-2" />
-                              {new Date(order.orderDate).toLocaleDateString()}
-                            </div>
-                          </td>
-                        </tr>
+                        <React.Fragment key={order.id}>
+                          <tr className="hover:bg-blue-50 transition-colors">
+                            <td className="border-b border-blue-100 px-4 py-3 text-blue-700 font-medium">#{order.id}</td>
+                            <td className="border-b border-blue-100 px-4 py-3">
+                              <div className="flex items-center">
+                                <Package size={16} className="text-blue-500 mr-2" />
+                                <span className="text-gray-700">
+                                  {order.orderDetails.length > 1 
+                                    ? `${order.orderDetails.length} products` 
+                                    : order.orderDetails[0]?.productName || 'No products'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="border-b border-blue-100 px-4 py-3">
+                              <div className="flex items-center">
+                                <User size={16} className="text-blue-500 mr-2" />
+                                {order.telecallingCustomer.customerName}
+                              </div>
+                            </td>
+                            <td className="border-b border-blue-100 px-4 py-3">{order.telecaller.username}</td>
+                            <td className="border-b border-blue-100 px-4 py-3">
+                              <div className="flex items-center">
+                                <Calendar size={16} className="text-blue-500 mr-2" />
+                                {new Date(order.orderDate).toLocaleDateString()}
+                              </div>
+                            </td>
+                            <td className="border-b border-blue-100 px-4 py-3">
+                              <button 
+                                className="text-blue-600 hover:text-blue-800 focus:outline-none flex items-center"
+                                onClick={() => toggleOrderDetails(order.id)}
+                              >
+                                {expandedOrders.includes(order.id) 
+                                  ? <><ChevronUp size={16} className="mr-1" /> Hide Details</> 
+                                  : <><ChevronDown size={16} className="mr-1" /> View Details</>}
+                              </button>
+                            </td>
+                          </tr>
+                          
+                          {/* Expanded Order Details */}
+                          {expandedOrders.includes(order.id) && (
+                            <tr>
+                              <td colSpan={6} className="bg-blue-50 px-4 py-3">
+                                <div className="p-3 rounded-md">
+                                  <h4 className="font-medium text-blue-800 mb-2">Order Details</h4>
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b border-blue-200">
+                                        <th className="py-2 px-3 text-left">Product Name</th>
+                                        <th className="py-2 px-3 text-left">Quantity</th>
+                                        <th className="py-2 px-3 text-left">Type</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {order.orderDetails.map((detail: { productName: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; quantity: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; isNewProduct: any; }, index: React.Key | null | undefined) => (
+                                        <tr key={index} className="border-b border-blue-100">
+                                          <td className="py-2 px-3">{detail.productName}</td>
+                                          <td className="py-2 px-3">{detail.quantity}</td>
+                                          <td className="py-2 px-3">
+                                            {detail.isNewProduct && (
+                                              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">New</span>
+                                            )}
+                                            {!detail.isNewProduct && (
+                                              <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">Existing</span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                  <div className="mt-3 flex items-center text-sm text-blue-600">
+                                    <Phone size={14} className="mr-2" />
+                                    Customer Phone: {order.telecallingCustomer.customerPhone}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>
@@ -358,7 +425,5 @@ const TelecallingDashboard: React.FC = () => {
     </div>
   );
 };
-
-
 
 export default TelecallingDashboard;

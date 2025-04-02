@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getTelecallerRemarksOrders = exports.updateCustomerRemarks = exports.getTelecallersWithOrderCount = exports.getNewProducts = exports.getAllTelecallingOrders = exports.getTelecallingOrders = exports.saveTelecallingOrder = exports.getProducts = exports.getTelecallingCustomers = void 0;
+exports.addNewTelecallingCustomer = exports.getTelecallerRemarksOrders = exports.updateCustomerRemarks = exports.getTelecallersWithOrderCount = exports.getNewProducts = exports.getAllTelecallingOrders = exports.getTelecallingOrders = exports.saveTelecallingOrder = exports.getProducts = exports.getTelecallingCustomers = void 0;
 const client_1 = require("@prisma/client");
+const uuid_1 = require("uuid");
 const prisma = new client_1.PrismaClient();
 const getTelecallingCustomers = async (_req, res) => {
     try {
@@ -313,4 +314,34 @@ const getTelecallerRemarksOrders = async (req, res) => {
     }
 };
 exports.getTelecallerRemarksOrders = getTelecallerRemarksOrders;
+const addNewTelecallingCustomer = async (req, res) => {
+    try {
+        const { storeName, customerName, customerPhone } = req.body;
+        if (!storeName || !customerName || !customerPhone) {
+            res.status(400).json({ error: "Store name, customer name, and phone number are required." });
+            return;
+        }
+        const existingCustomer = await prisma.telecallingCustomer.findFirst({
+            where: { customerPhone },
+        });
+        if (existingCustomer) {
+            res.status(400).json({ error: "Customer with this phone number already exists." });
+            return;
+        }
+        const newCustomer = await prisma.telecallingCustomer.create({
+            data: {
+                customerId: parseInt((0, uuid_1.v4)().replace(/-/g, "").slice(0, 4), 16),
+                storeName,
+                customerName,
+                customerPhone,
+            },
+        });
+        res.status(201).json(newCustomer);
+    }
+    catch (error) {
+        console.error("Error adding new telecalling customer:", error);
+        res.status(500).json({ error: "Failed to add new telecalling customer." });
+    }
+};
+exports.addNewTelecallingCustomer = addNewTelecallingCustomer;
 //# sourceMappingURL=tellicallingController.js.map

@@ -149,7 +149,7 @@ const getNonBuyingMonthlyCustomers = async (_req, res) => {
 exports.getNonBuyingMonthlyCustomers = getNonBuyingMonthlyCustomers;
 const getCustomerReport = async (req, res) => {
     try {
-        const { startDate, endDate, storeId, search } = req.query;
+        const { startDate, endDate, storeId, search, billNo } = req.query;
         const start = startDate ? new Date(startDate) : undefined;
         const end = endDate ? new Date(endDate) : undefined;
         const whereCondition = {};
@@ -161,6 +161,9 @@ const getCustomerReport = async (req, res) => {
         }
         if (storeId) {
             whereCondition.storeId = Number(storeId);
+        }
+        if (billNo) {
+            whereCondition.billNo = billNo;
         }
         if (search) {
             whereCondition.OR = [
@@ -191,26 +194,53 @@ const getCustomerReport = async (req, res) => {
             const { id, name, phone } = bill.customer;
             if (!customerData.has(id)) {
                 customerData.set(id, {
+                    customerId: id,
                     customerName: name,
                     mobileNo: phone,
-                    totalSales: 0,
-                    totalProducts: 0,
-                    bills: [],
+                    totalBills: 0,
+                    totalAmount: 0,
+                    dates: new Map(),
                 });
             }
             const customerEntry = customerData.get(id);
-            customerEntry.totalSales += bill.netAmount;
-            customerEntry.totalProducts += bill.billDetails.reduce((sum, detail) => sum + detail.quantity, 0);
-            customerEntry.bills.push({
-                billNo: bill.billNo,
-                date: bill.date,
-                medicines: bill.billDetails.map((detail) => ({
-                    name: detail.item,
-                    quantity: detail.quantity,
-                })),
-            });
+            customerEntry.totalBills += 1;
+            customerEntry.totalAmount += bill.amountPaid;
+            const dateKey = bill.date.toISOString().split("T")[0];
+            if (!customerEntry.dates.has(dateKey)) {
+                customerEntry.dates.set(dateKey, {
+                    date: dateKey,
+                    totalAmount: 0,
+                    salesBills: [],
+                    returnBills: [],
+                });
+            }
+            const dateEntry = customerEntry.dates.get(dateKey);
+            dateEntry.totalAmount += bill.amountPaid;
+            if (bill.billNo.startsWith("CS")) {
+                dateEntry.salesBills.push({
+                    billNo: bill.billNo,
+                    amount: bill.amountPaid,
+                    medicines: bill.billDetails.map((detail) => ({
+                        name: detail.item,
+                        quantity: detail.quantity,
+                    })),
+                });
+            }
+            else if (bill.billNo.startsWith("CN")) {
+                dateEntry.returnBills.push({
+                    billNo: bill.billNo,
+                    amount: bill.amountPaid,
+                    medicines: bill.billDetails.map((detail) => ({
+                        name: detail.item,
+                        quantity: detail.quantity,
+                    })),
+                });
+            }
         });
-        const result = Array.from(customerData.values());
+        const result = Array.from(customerData.values()).map((customer) => ({
+            ...customer,
+            dates: Array.from(customer.dates.values()),
+        }));
         res.json(result);
     }
     catch (error) {

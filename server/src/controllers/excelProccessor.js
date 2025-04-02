@@ -87,6 +87,7 @@ const DEFAULT_NAME = "Cashlist Customer";
     let rowCount = 0;
     let processedRows = 0;
     let lastProgressUpdate = 0;
+    let currentCustomerStartRow = 0;
     
     // Create an ExcelJS workbook and stream rows from the file
     const workbook = new ExcelJS.Workbook();
@@ -355,12 +356,10 @@ const DEFAULT_NAME = "Cashlist Customer";
     console.time('Row processing');
     for (let i = 0; i < sheetRows.length; i++) {
       const rowArray = sheetRows[i];
-
-      
       
       // Customer header row
       if (isCustomerHeader(rowArray)) {
-        // Save previous customer's bills
+        // Save previous customer's bills before moving to a new customer
         if (currentCustomerBills.length > 0) {
           billRecords.push(...currentCustomerBills);
           currentCustomerBills = [];
@@ -380,39 +379,71 @@ const DEFAULT_NAME = "Cashlist Customer";
           name: customerInfo.customerName,
           date: date
         };
+        
+        // Set a clear marker for the start of a new customer section
+        currentCustomerStartRow = i;
       }
-      // Bill number row
+      // Bill number row - ONLY associate with current customer if we're in their section
       else if (currentCustomer && isBillNumberRow(rowArray)) {
         const billNo = extractBillNumber(rowArray);
-
-        let billDate = lastValidDate;
-        for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
-          if (isDateRow(sheetRows[j])) {
-            billDate = extractDate(sheetRows[j]);
-            lastValidDate = billDate;
-            break;
+    
+        // Determine if this bill belongs to the current customer or is misplaced
+        let belongsToCurrentCustomer = true;
+        
+        // If we're far from the customer header, check if there might be another customer
+        // header that we missed between the current customer and this bill
+        if (i - currentCustomerStartRow > 10) {
+          // Look back a few rows to see if we missed a customer header
+          for (let j = Math.max(currentCustomerStartRow + 1, i - 10); j < i; j++) {
+            if (isCustomerHeader(sheetRows[j]) && !isDateRow(sheetRows[j])) {
+              // We likely missed a customer header, this bill may not belong to the current customer
+              belongsToCurrentCustomer = false;
+              
+              // If this happens, we need to re-process from that missed customer header
+              i = j - 1; // Rewind to just before the missed customer header
+              
+              // Save the current customer's bills before switching
+              if (currentCustomerBills.length > 0) {
+                billRecords.push(...currentCustomerBills);
+                currentCustomerBills = [];
+              }
+              
+              break;
+            }
           }
         }
         
-        const newBill = {
-          billNo: billNo,
-          customerPhone: currentCustomer.phone,
-          customerName: currentCustomer.name,
-          date: billDate,
-          items: [],
-          totalAmount: 0,
-          cash: 0,
-          credit: 0
-        };
-        
-        const payments = extractCashAndCredit(rowArray, billNo);
-        newBill.cash = payments.cash;
-        newBill.credit = payments.credit;
-        
-        currentCustomerBills.push(newBill);
-        currentBill = newBill;
+        // Only process this bill if it belongs to the current customer
+        if (belongsToCurrentCustomer) {
+          let billDate = lastValidDate;
+          for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
+            if (isDateRow(sheetRows[j])) {
+              billDate = extractDate(sheetRows[j]);
+              lastValidDate = billDate;
+              break;
+            }
+          }
+          
+          const newBill = {
+            billNo: billNo,
+            customerPhone: currentCustomer.phone,
+            customerName: currentCustomer.name,
+            date: billDate,
+            items: [],
+            totalAmount: 0,
+            cash: 0,
+            credit: 0
+          };
+          
+          const payments = extractCashAndCredit(rowArray, billNo);
+          newBill.cash = payments.cash;
+          newBill.credit = payments.credit;
+          
+          currentCustomerBills.push(newBill);
+          currentBill = newBill;
+        }
       }
-      // Item row
+      // Item row - Only process if we have a valid current bill
       else if (currentBill && isItemRow(rowArray)) {
         const item = extractItemDetails(rowArray);
         currentBill.items.push(item);
@@ -462,44 +493,66 @@ const DEFAULT_NAME = "Cashlist Customer";
             }
           }
         }
+        
+        // Check if we've reached the end of a customer section
         if (i + 1 < sheetRows.length) {
           const nextRow = sheetRows[i + 1];
-          if (!isItemRow(nextRow) && !isBillNumberRow(nextRow)) {
-            // This appears to be the end of the current customer section
-            // Save the current bills
+          
+          // Look ahead to see if we're starting a new customer section
+          let foundNextCustomer = false;
+          for (let j = i + 1; j < Math.min(i + 10, sheetRows.length); j++) {
+            if (isCustomerHeader(sheetRows[j])) {
+              foundNextCustomer = true;
+              break;
+            }
+          }
+          
+          // If we found a new customer header coming up, close the current section
+          if (foundNextCustomer && !isItemRow(nextRow) && !isBillNumberRow(nextRow)) {
             billRecords.push(...currentCustomerBills);
             currentCustomerBills = [];
-      
-            // Reset the current customer to a cash customer for any bills without a clear owner
-            currentCustomer = {
-              phone: DEFAULT_PHONE,
-              name: DEFAULT_NAME,
-              date: lastValidDate,
-              isCashlist: true
-            };
+            currentBill = null;
           }
         }
       }
-      // Special handling for tables with multiple bills
-      else if (rowArray && currentCustomerBills.length > 0) {
-        let billNo = null;
-        for (const value of rowArray) {
-          if (!value) continue;
-          const strValue = String(value).trim();
-          if (/^(CS|CN)\/\d+$/.test(strValue)) {
-            billNo = strValue;
-            break;
+      
+      // Add a section boundary detection for tables with multiple customers
+      // This catches cases where customer sections aren't clearly delineated
+      if (currentCustomer && i - currentCustomerStartRow > 5) {
+        // Check if this might be the start of a new customer section without a proper header
+        if (rowArray.length > 0 && 
+            !isItemRow(rowArray) && 
+            !isBillNumberRow(rowArray) &&
+            !isBillTotal(rowArray)) {
+            
+          // Look for table section patterns - multiple bill numbers in summary format
+          let billCount = 0;
+          for (const value of rowArray) {
+            if (!value) continue;
+            const strValue = String(value).trim();
+            if (/^(CS|CN)\/\d+$/.test(strValue)) {
+              billCount++;
+            }
           }
-        }
-        
-        if (billNo) {
-          const billIndex = currentCustomerBills.findIndex(bill => bill.billNo === billNo);
           
-          if (billIndex >= 0) {
-            const payments = extractCashAndCredit(rowArray, billNo);
-            if (payments.cash > 0 || payments.credit !== 0) {
-              currentCustomerBills[billIndex].cash = payments.cash;
-              currentCustomerBills[billIndex].credit = payments.credit;
+          // If there are multiple bills in a summary row, this might be a section boundary
+          if (billCount > 1) {
+            // Check ahead for customer headers
+            let foundCustomerAhead = false;
+            for (let j = i + 1; j < Math.min(i + 3, sheetRows.length); j++) {
+              if (isCustomerHeader(sheetRows[j])) {
+                foundCustomerAhead = true;
+                break;
+              }
+            }
+            
+            if (foundCustomerAhead) {
+              // We're at a section boundary, save current customer bills
+              if (currentCustomerBills.length > 0) {
+                billRecords.push(...currentCustomerBills);
+                currentCustomerBills = [];
+                currentBill = null;
+              }
             }
           }
         }

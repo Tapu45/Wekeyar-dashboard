@@ -42,6 +42,7 @@ const SummaryReport: React.FC = () => {
       });
       return data;
     },
+    enabled: !!appliedFilters.fromDate && !!appliedFilters.toDate, // Only fetch if both dates are set
   });
 
   const handleCopyToTelecalling = (customers: any[]) => {

@@ -38,6 +38,7 @@ const InactiveCustomerList: React.FC<InactiveCustomerListProps> = ({ onCopyToTel
   const { data, isLoading, error } = useQuery({
     queryKey: ["inactiveCustomers", fromDate, toDate], // Include fromDate and toDate in the query key
     queryFn: fetchInactiveCustomers,
+    enabled: !!fromDate && !!toDate,
   });
 
   const [selectedCustomers, setSelectedCustomers] = useState<InactiveCustomer[]>([]);

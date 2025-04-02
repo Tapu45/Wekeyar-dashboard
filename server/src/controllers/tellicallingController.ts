@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { CustomRequest } from "../types/types";
+import { v4 as uuidv4 } from "uuid";
 
 const prisma = new PrismaClient();
 
@@ -371,6 +372,46 @@ export const getTelecallerRemarksOrders = async (req: CustomRequest, res: Respon
   } catch (error) {
     console.error("Error fetching telecaller remarks/orders:", error);
     res.status(500).json({ error: "Failed to fetch telecaller remarks/orders" });
+  }
+};
+
+/**
+ * Add a new telecalling customer
+ */
+export const addNewTelecallingCustomer = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { storeName, customerName, customerPhone } = req.body;
+
+    // Validate input
+    if (!storeName || !customerName || !customerPhone) {
+     res.status(400).json({ error: "Store name, customer name, and phone number are required." });
+      return;
+    }
+
+    // Check if the customer already exists
+    const existingCustomer = await prisma.telecallingCustomer.findFirst({
+      where: { customerPhone },
+    });
+
+    if (existingCustomer) {
+     res.status(400).json({ error: "Customer with this phone number already exists." });
+      return;
+    }
+
+    // Create a new customer
+    const newCustomer = await prisma.telecallingCustomer.create({
+      data: {
+        customerId: parseInt(uuidv4().replace(/-/g, "").slice(0, 4), 16), // Generate a unique 10-digit number
+        storeName,
+        customerName,
+        customerPhone,
+      },
+    });
+
+    res.status(201).json(newCustomer);
+  } catch (error) {
+    console.error("Error adding new telecalling customer:", error);
+    res.status(500).json({ error: "Failed to add new telecalling customer." });
   }
 };
 

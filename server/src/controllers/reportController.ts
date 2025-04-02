@@ -207,7 +207,7 @@ export const getCustomerReport = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { startDate, endDate, storeId, search } = req.query;
+    const { startDate, endDate, storeId, search, billNo } = req.query;
 
     // Convert query params to proper types
     const start = startDate ? new Date(startDate as string) : undefined;
@@ -215,6 +215,7 @@ export const getCustomerReport = async (
 
     const whereCondition: any = {};
 
+    // Filter by date range
     if (start && end) {
       whereCondition.date = {
         gte: start,
@@ -222,10 +223,17 @@ export const getCustomerReport = async (
       };
     }
 
+    // Filter by store ID
     if (storeId) {
       whereCondition.storeId = Number(storeId);
     }
 
+    // Filter by bill number
+    if (billNo) {
+      whereCondition.billNo = billNo as string;
+    }
+
+    // Filter by customer name or phone
     if (search) {
       whereCondition.OR = [
         {
@@ -245,15 +253,15 @@ export const getCustomerReport = async (
     const bills = await prisma.bill.findMany({
       where: whereCondition,
       include: {
-        customer: true,
-        billDetails: true, // Include bill details
+        customer: true, // Include customer details
+        billDetails: true, // Include medicine details
       },
       orderBy: {
         date: "desc", // Ensure bills are ordered by date
       },
     });
 
-    // Group by customer
+    // Group data by customer
     const customerData = new Map();
 
     bills.forEach((bill) => {
@@ -261,36 +269,62 @@ export const getCustomerReport = async (
 
       if (!customerData.has(id)) {
         customerData.set(id, {
+          customerId: id,
           customerName: name,
           mobileNo: phone,
-          totalSales: 0,
-          totalProducts: 0, // Total quantity of products
-          bills: [],
+          totalBills: 0,
+          totalAmount: 0,
+          dates: new Map(), // Group bills by date
         });
       }
 
       const customerEntry = customerData.get(id);
 
-      // Update total sales and product quantity
-      customerEntry.totalSales += bill.netAmount;
-      customerEntry.totalProducts += bill.billDetails.reduce(
-        (sum, detail) => sum + detail.quantity,
-        0
-      );
+      // Update total bills and total amount
+      customerEntry.totalBills += 1;
+      customerEntry.totalAmount += bill.amountPaid; // Use amountPaid instead of netAmount
 
-      // Add bill details
-      customerEntry.bills.push({
-        billNo: bill.billNo,
-        date: bill.date,
-        medicines: bill.billDetails.map((detail) => ({
-          name: detail.item,
-          quantity: detail.quantity,
-        })),
-      });
+      // Group bills by date
+      const dateKey = bill.date.toISOString().split("T")[0];
+      if (!customerEntry.dates.has(dateKey)) {
+        customerEntry.dates.set(dateKey, {
+          date: dateKey,
+          totalAmount: 0,
+          salesBills: [], // Separate sales bills
+          returnBills: [], // Separate return bills
+        });
+      }
+
+      const dateEntry = customerEntry.dates.get(dateKey);
+      dateEntry.totalAmount += bill.amountPaid; // Use amountPaid instead of netAmount
+
+      // Group bills into sales or returns based on billNo prefix
+      if (bill.billNo.startsWith("CS")) {
+        dateEntry.salesBills.push({
+          billNo: bill.billNo,
+          amount: bill.amountPaid,
+          medicines: bill.billDetails.map((detail) => ({
+            name: detail.item,
+            quantity: detail.quantity,
+          })),
+        });
+      } else if (bill.billNo.startsWith("CN")) {
+        dateEntry.returnBills.push({
+          billNo: bill.billNo,
+          amount: bill.amountPaid,
+          medicines: bill.billDetails.map((detail) => ({
+            name: detail.item,
+            quantity: detail.quantity,
+          })),
+        });
+      }
     });
 
     // Convert Map to JSON-friendly format
-    const result = Array.from(customerData.values());
+    const result = Array.from(customerData.values()).map((customer) => ({
+      ...customer,
+      dates: Array.from(customer.dates.values()),
+    }));
 
     res.json(result);
   } catch (error) {

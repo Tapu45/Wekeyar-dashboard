@@ -7,7 +7,8 @@ import {
   getAllTelecallingOrders,
   getNewProducts,
   updateCustomerRemarks,
-  getTelecallerRemarksOrders, // Import the new controller function
+  getTelecallerRemarksOrders,
+  addNewTelecallingCustomer, // Import the new controller function
 } from "../controllers/tellicallingController";
 import { authenticateUser } from "../authMiddleware";
 
@@ -39,5 +40,7 @@ router.get(
   authenticateUser, // Middleware to authenticate the telecaller
   getTelecallerRemarksOrders
 );
+
+router.post("/customers/new", addNewTelecallingCustomer);
 
 export default router;

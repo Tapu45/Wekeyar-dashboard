@@ -15,6 +15,7 @@ import {
   Plus,
   MessageSquare
 } from "lucide-react";
+import NewCustomerModal from "./NewCustomerModal";
 
 const socket = io(import.meta.env.VITE_API_URL); // Replace with your server URL
 
@@ -140,6 +141,7 @@ const Telecalling: React.FC = () => {
   const [selectedRemarkCustomerId, setSelectedRemarkCustomerId] = useState<number | null>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const [newCustomerModalOpen, setNewCustomerModalOpen] = useState(false); // State for modal
 
   useEffect(() => {
     // Fetch telecalling customers
@@ -212,6 +214,10 @@ const Telecalling: React.FC = () => {
     setProductName("");
     setQuantity(1);
     setShowSuggestions(false);
+  };
+
+  const handleAddNewCustomer = (newCustomers: Customer[]) => {
+    setCustomers((prev) => [...prev, ...newCustomers]); // Add all new customers to the list
   };
 
   const handleOpenRemarksModal = (customerId: number, initialRemarks: string = "") => {
@@ -346,6 +352,12 @@ const Telecalling: React.FC = () => {
     <div className="bg-gray-50 min-h-screen"> 
       <ToastContainer />
       
+      <NewCustomerModal
+      isOpen={newCustomerModalOpen} // Modal open state
+      onClose={() => setNewCustomerModalOpen(false)} // Close the modal
+      onSave={handleAddNewCustomer} // Save the new customer
+    />
+      
       {/* Remarks Modal */}
       <AnimatePresence>
         {remarksModalOpen && selectedRemarkCustomerId && (
@@ -360,13 +372,23 @@ const Telecalling: React.FC = () => {
       </AnimatePresence>
   
       <div className="max-w-7xl mx-auto p-6">
-        <header className="mb-8">
-          <div className="flex items-center mb-2">
-            <PhoneCall className="text-blue-600 mr-2" size={28} />
-            <h1 className="text-3xl font-bold text-gray-800">Telecalling Dashboard</h1>
-          </div>
-          <p className="text-gray-600">Manage your telecalling customers and orders</p>
-        </header>
+      <header className="mb-8 flex justify-between items-center">
+  <div>
+    <div className="flex items-center mb-2">
+      <PhoneCall className="text-blue-600 mr-2" size={28} />
+      <h1 className="text-3xl font-bold text-gray-800">Telecalling Dashboard</h1>
+    </div>
+    <p className="text-gray-600">Manage your telecalling customers and orders</p>
+  </div>
+  
+  <button
+    onClick={() => setNewCustomerModalOpen(true)} // Open the modal
+    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center"
+  >
+    <Plus size={20} className="mr-2" />
+    Add New Customer
+  </button>
+</header>
   
         {selectedCustomer ? (
           <div className="mb-6 flex items-center justify-between">

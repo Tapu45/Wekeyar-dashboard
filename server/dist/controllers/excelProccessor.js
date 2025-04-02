@@ -116,12 +116,17 @@ async function processExcelFile() {
             sheetRows.push(rowArray);
         });
         function isCustomerHeader(rowArray) {
-            return rowArray.some(value => {
+            if (!rowArray[0])
+                return false;
+            const firstCellValue = String(rowArray[0]).trim();
+            const isValidCustomerPattern = /^\d{10}\s+[A-Z\s]+$/.test(firstCellValue);
+            const hasBillNumber = rowArray.some(value => {
                 if (!value)
                     return false;
                 const strValue = String(value).trim();
-                return /^\d{9,10}\s+\w/.test(strValue);
+                return /^(CS\/|CN)\d+$/.test(strValue);
             });
+            return isValidCustomerPattern && !hasBillNumber;
         }
         function isDateRow(rowArray) {
             return rowArray.some(value => {

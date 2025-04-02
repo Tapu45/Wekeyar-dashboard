@@ -155,11 +155,29 @@ const DEFAULT_NAME = "Cashlist Customer";
     
     // Helper functions for row classification using arrays
     function isCustomerHeader(rowArray) {
-      return rowArray.some(value => {
+      // This function should ONLY identify the main customer headers at the top of sections
+      // (like "9437493311 AJAY KUMAR" in your images)
+      
+      // Only consider it a customer header if:
+      // 1. It's just a 10-digit phone number followed by a name
+      // 2. It's in the first column (appears to be the pattern in your Excel)
+      // 3. There's no bill number (CS/xxxxx) in this row
+      
+      if (!rowArray[0]) return false;
+      
+      const firstCellValue = String(rowArray[0]).trim();
+      
+      // Check for exact pattern: 10 digits followed by name
+      const isValidCustomerPattern = /^\d{10}\s+[A-Z\s]+$/.test(firstCellValue);
+      
+      // Make sure there's no bill number in this row
+      const hasBillNumber = rowArray.some(value => {
         if (!value) return false;
         const strValue = String(value).trim();
-        return /^\d{9,10}\s+\w/.test(strValue);
+        return /^(CS\/|CN)\d+$/.test(strValue);
       });
+      
+      return isValidCustomerPattern && !hasBillNumber;
     }
     
     function isDateRow(rowArray) {

@@ -18,6 +18,7 @@ export const API_ROUTES = {
     STORE_SALES_REPORT: "/reports/store-sales-report",
     CUSTOMERS: "/reports/customers",
     UPLOADSTATUS: "/reports/upload-status",
+    CUSTOMER_PURCHASE_HISTORY: "/reports/customer/:customerId/purchase-history",
     UPLOAD: "/api/upload",
     UPLOAD_SYNC: "/api/upload/sync",
     UPLOAD_HISTORY: "/api/upload/history",

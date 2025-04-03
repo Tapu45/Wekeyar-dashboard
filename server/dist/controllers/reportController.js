@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUploadStatusByMonth = exports.getBillDetailsByBillNo = exports.getInactiveCustomers = exports.getAllCustomers = exports.getStoreWiseSalesReport = exports.getCustomerReport = exports.getNonBuyingMonthlyCustomers = exports.getNonBuyingCustomers = exports.getSummary = exports.prisma = void 0;
+exports.getUploadStatusByMonth = exports.getBillDetailsByBillNo = exports.getCustomerPurchaseHistory = exports.getInactiveCustomers = exports.getAllCustomers = exports.getStoreWiseSalesReport = exports.getCustomerReport = exports.getNonBuyingMonthlyCustomers = exports.getNonBuyingCustomers = exports.getSummary = exports.prisma = void 0;
 const client_1 = require("@prisma/client");
 const date_fns_1 = require("date-fns");
 exports.prisma = new client_1.PrismaClient();
@@ -449,6 +449,60 @@ const getInactiveCustomers = async (req, res) => {
     }
 };
 exports.getInactiveCustomers = getInactiveCustomers;
+const getCustomerPurchaseHistory = async (req, res) => {
+    try {
+        const { customerId } = req.params;
+        if (!customerId) {
+            res.status(400).json({ error: "Customer ID is required" });
+            return;
+        }
+        const currentDate = new Date();
+        const pastYearStart = new Date(currentDate.getFullYear() - 1, currentDate.getMonth(), 1);
+        const bills = await exports.prisma.bill.findMany({
+            where: {
+                customerId: Number(customerId),
+                date: {
+                    gte: pastYearStart,
+                    lte: currentDate,
+                },
+            },
+            include: {
+                billDetails: true,
+            },
+            orderBy: {
+                date: "desc",
+            },
+        });
+        const monthlyData = bills.reduce((acc, bill) => {
+            const monthKey = `${bill.date.getFullYear()}-${bill.date.getMonth() + 1}`;
+            if (!acc[monthKey]) {
+                acc[monthKey] = { totalAmount: 0, totalBills: 0, dailyData: {} };
+            }
+            acc[monthKey].totalAmount += bill.netAmount;
+            acc[monthKey].totalBills += 1;
+            const dayKey = bill.date.toISOString().split("T")[0];
+            if (!acc[monthKey].dailyData[dayKey]) {
+                acc[monthKey].dailyData[dayKey] = { totalAmount: 0, bills: [] };
+            }
+            acc[monthKey].dailyData[dayKey].totalAmount += bill.netAmount;
+            acc[monthKey].dailyData[dayKey].bills.push({
+                billNo: bill.billNo,
+                amount: bill.netAmount,
+                medicines: bill.billDetails.map((detail) => ({
+                    name: detail.item,
+                    quantity: detail.quantity,
+                })),
+            });
+            return acc;
+        }, {});
+        res.status(200).json(monthlyData);
+    }
+    catch (error) {
+        console.error("Error fetching customer purchase history:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+};
+exports.getCustomerPurchaseHistory = getCustomerPurchaseHistory;
 const getBillDetailsByBillNo = async (req, res) => {
     try {
         const { billNo } = req.params;

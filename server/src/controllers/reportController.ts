@@ -530,7 +530,7 @@ export const getInactiveCustomers = async (req: Request, res: Response) => {
   try {
     const { fromDate, toDate } = req.query;
 
-    // Default date range: current month and previous month
+    // Default date range: current monzth and previous month
     const today = new Date();
     const defaultFromDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     const defaultToDate = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
@@ -604,6 +604,69 @@ export const getInactiveCustomers = async (req: Request, res: Response) => {
     res.json(result);
   } catch (error) {
     console.error("Error fetching inactive customers:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const getCustomerPurchaseHistory = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { customerId } = req.params;
+
+    if (!customerId) {
+      res.status(400).json({ error: "Customer ID is required" });
+      return;
+    }
+
+    const currentDate = new Date();
+    const pastYearStart = new Date(currentDate.getFullYear() - 1, currentDate.getMonth(), 1);
+
+    // Fetch bills for the past 12 months
+    const bills = await prisma.bill.findMany({
+      where: {
+        customerId: Number(customerId),
+        date: {
+          gte: pastYearStart,
+          lte: currentDate,
+        },
+      },
+      include: {
+        billDetails: true, // Include medicine details
+      },
+      orderBy: {
+        date: "desc",
+      },
+    });
+
+    // Group data by month
+    const monthlyData = bills.reduce((acc: { [key: string]: { totalAmount: number; totalBills: number; dailyData: { [key: string]: { totalAmount: number; bills: any[] } } } }, bill) => {
+      const monthKey = `${bill.date.getFullYear()}-${bill.date.getMonth() + 1}`;
+      if (!acc[monthKey]) {
+        acc[monthKey] = { totalAmount: 0, totalBills: 0, dailyData: {} };
+      }
+      acc[monthKey].totalAmount += bill.netAmount;
+      acc[monthKey].totalBills += 1;
+
+      // Group data by day
+      const dayKey = bill.date.toISOString().split("T")[0];
+      if (!acc[monthKey].dailyData[dayKey]) {
+        acc[monthKey].dailyData[dayKey] = { totalAmount: 0, bills: [] };
+      }
+      acc[monthKey].dailyData[dayKey].totalAmount += bill.netAmount;
+      acc[monthKey].dailyData[dayKey].bills.push({
+        billNo: bill.billNo,
+        amount: bill.netAmount,
+        medicines: bill.billDetails.map((detail) => ({
+          name: detail.item,
+          quantity: detail.quantity,
+        })),
+      });
+
+      return acc;
+    }, {});
+
+    res.status(200).json(monthlyData);
+  } catch (error) {
+    console.error("Error fetching customer purchase history:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };

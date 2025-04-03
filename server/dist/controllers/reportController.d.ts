@@ -8,5 +8,6 @@ export declare const getCustomerReport: (req: Request, res: Response) => Promise
 export declare const getStoreWiseSalesReport: (req: Request, res: Response) => Promise<void>;
 export declare const getAllCustomers: (_req: Request, res: Response) => Promise<void>;
 export declare const getInactiveCustomers: (req: Request, res: Response) => Promise<void>;
+export declare const getCustomerPurchaseHistory: (req: Request, res: Response) => Promise<void>;
 export declare const getBillDetailsByBillNo: (req: Request, res: Response) => Promise<void>;
 export declare const getUploadStatusByMonth: (req: Request, res: Response) => Promise<void>;

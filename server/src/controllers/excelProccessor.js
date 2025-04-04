@@ -7,7 +7,6 @@ const path = require('path');
 const stream = require('stream');
 const { promisify } = require('util');
 const pipeline = promisify(stream.pipeline);
-const XLSX = require('xlsx');
 
 
 // Create a Prisma client with correct configuration
@@ -42,67 +41,6 @@ async function executeWithRetry(operation, maxRetries = 3) {
   throw lastError;
 }
 
-// Helper function to detect file type from URL or filename
-function getFileExtension(url) {
-  const filename = url.split('/').pop().split('?')[0];
-  return path.extname(filename).toLowerCase();
-}
-
-// Enhanced function to detect file type based on content, not just URL
-function detectFileType(buffer) {
-  // Check file signature (magic numbers)
-  const header = buffer.slice(0, 8).toString('hex');
-  
-  // XLSX signature (PKZip format)
-  if (header.startsWith('504b0304')) {
-    return '.xlsx';
-  }
-  // XLS signature (Compound File Binary Format)
-  else if (header.startsWith('d0cf11e0')) {
-    return '.xls';
-  }
-  // If can't detect by signature, default to XLS for safety
-  return '.xls';
-}
-
-// Improved function to convert XLS to XLSX if needed
-async function convertXlsToXlsxIfNeeded(fileUrl) {
-  console.log(`Downloading file from: ${fileUrl}`);
-  
-  // Download the file
-  const response = await axios({
-    method: 'get',
-    url: fileUrl,
-    responseType: 'arraybuffer' 
-  });
-  
-  // Detect file type from content, not URL
-  const fileType = detectFileType(response.data);
-  console.log(`Detected file type: ${fileType}`);
-  
-  // If it's already XLSX, just return the buffer
-  if (fileType === '.xlsx') {
-    console.log('File is already in XLSX format, no conversion needed');
-    return { buffer: response.data, needsConversion: false };
-  }
-  
-  console.log('Converting XLS file to XLSX format');
-  
-  try {
-    // Read the xls file
-    const workbook = XLSX.read(response.data, { type: 'buffer' });
-    
-    // Convert to xlsx
-    const xlsxBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
-    
-    console.log('XLS to XLSX conversion successful');
-    return { buffer: xlsxBuffer, needsConversion: true };
-  } catch (error) {
-    console.error('Error converting XLS to XLSX:', error);
-    throw new Error(`Failed to convert XLS to XLSX: ${error.message}`);
-  }
-}
-
 async function processExcelFile() {
 
   const DEFAULT_PHONE = "9999999999";
@@ -114,13 +52,16 @@ const DEFAULT_NAME = "Cashlist Customer";
     console.log(`Downloading file from Cloudinary: ${fileUrl}`);
     
     // Download file using streaming to reduce memory usage
-    const { buffer, needsConversion } = await convertXlsToXlsxIfNeeded(fileUrl);
+  
     
-    if (needsConversion) {
-      console.log('Using converted XLSX file for processing');
-    } else {
-      console.log('Using original file for processing');
-    }
+    const response = await axios({
+      method: 'get',
+      url: fileUrl,
+      responseType: 'stream'
+    });
+    
+  
+    
     // Track progress
     const startTime = Date.now();
     const storeMap = new Map();
@@ -151,7 +92,7 @@ const DEFAULT_NAME = "Cashlist Customer";
     const workbook = new ExcelJS.Workbook();
     console.time('Excel parsing');
     
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.read(response.data);
     console.log('File downloaded and loaded into memory.');
     const worksheet = workbook.getWorksheet(1); // Get the first worksheet
     rowCount = worksheet.rowCount;

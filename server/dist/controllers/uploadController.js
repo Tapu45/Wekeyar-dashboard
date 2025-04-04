@@ -19,6 +19,12 @@ const uploadExcelFile = async (req, res) => {
         }
         const file = req.file;
         const fileName = req.file.originalname;
+        const fileExtension = path_1.default.extname(fileName).toLowerCase();
+        if (fileExtension !== ".xlsx") {
+            console.error("Invalid file format. Only .xlsx files are supported.");
+            res.status(400).json({ error: "Invalid file format. Only .xlsx files are supported." });
+            return;
+        }
         console.log("Uploading file to Cloudinary...");
         const cloudinaryResult = await new Promise((resolve, reject) => {
             const stream = cloudinary_1.default.uploader.upload_stream({ folder: "uploads", resource_type: "raw" }, (error, result) => {

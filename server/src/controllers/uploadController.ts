@@ -20,6 +20,14 @@ export const uploadExcelFile = async (req: Request, res: Response): Promise<void
     const file = req.file as Express.Multer.File;
     const fileName = req.file.originalname;
 
+    // Validate file extension
+    const fileExtension = path.extname(fileName).toLowerCase();
+    if (fileExtension !== ".xlsx") {
+      console.error("Invalid file format. Only .xlsx files are supported.");
+      res.status(400).json({ error: "Invalid file format. Only .xlsx files are supported." });
+      return;
+    }
+
     // Upload the file to Cloudinary directly from memory
     console.log("Uploading file to Cloudinary...");
     const cloudinaryResult = await new Promise((resolve, reject) => {

@@ -110,6 +110,13 @@ const FileUpload: React.FC = () => {
       return;
     }
 
+     // Validate file extension
+  const fileExtension = file.name.split(".").pop()?.toLowerCase();
+  if (fileExtension !== "xlsx") {
+    setError("Invalid file format. Only .xlsx files are supported.");
+    return;
+  }
+
     const formData = new FormData();
     formData.append("excelFile", file);
 
@@ -768,14 +775,15 @@ const FileUpload: React.FC = () => {
   
   
 
-  const toggleFileDetails = (id: string) => {
-    if (expandedFileId === id) {
+  const toggleFileDetails = (id: string | number) => {
+    const uploadId = id.toString(); // Ensure the ID is a string
+    if (expandedFileId === uploadId) {
       setExpandedFileId(null);
       setLogs([]); // Clear logs when collapsing
     } else {
-      setExpandedFileId(id);
+      setExpandedFileId(uploadId);
       setLogs([]); // Clear previous logs
-      fetchLogs(id); // Fetch logs for the selected file
+      fetchLogs(uploadId); // Fetch logs for the selected file
     }
   };
 
@@ -870,7 +878,7 @@ const FileUpload: React.FC = () => {
                         </span>
                       ) : (
                         <span className="text-sm text-gray-500 mt-2">
-                          Supports .xlsx and .xls files
+                          Supports only .xlsx and files
                         </span>
                       )}
                     </div>

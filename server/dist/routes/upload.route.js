@@ -19,5 +19,6 @@ router.post('/upload', (req, res, next) => {
 router.get('/upload/history', uploadController_1.getUploadHistory);
 router.delete("/upload/history/:id?", uploadController_1.deleteUploadHistory);
 router.get("/upload/status/:id", uploadController_1.getUploadStatus);
+router.get("/upload/logs/:id", uploadController_1.uploadLogsSSE);
 exports.default = router;
 //# sourceMappingURL=upload.route.js.map

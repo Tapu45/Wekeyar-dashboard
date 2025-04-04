@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendProgressUpdate = exports.uploadProgressSSE = exports.getUploadStatus = exports.deleteUploadHistory = exports.getUploadHistory = exports.uploadExcelFile = void 0;
+exports.sendLogUpdate = exports.uploadLogsSSE = exports.getUploadStatus = exports.deleteUploadHistory = exports.getUploadHistory = exports.uploadExcelFile = void 0;
 const client_1 = require("@prisma/client");
 const fs_1 = __importDefault(require("fs"));
 const worker_threads_1 = require("worker_threads");
@@ -53,7 +53,13 @@ const uploadExcelFile = async (req, res) => {
             workerData: { fileUrl: cloudinaryResult.secure_url },
         });
         worker.on("message", async (message) => {
-            if (message.status === "completed") {
+            if (message.status === "log") {
+                (0, exports.sendLogUpdate)(uploadHistory.id, message.log);
+            }
+            else if (message.status === "progress") {
+                (0, exports.sendLogUpdate)(uploadHistory.id, `Progress: ${message.progress}%`);
+            }
+            else if (message.status === "completed") {
                 await prisma.uploadHistory.update({
                     where: { id: uploadHistory.id },
                     data: { status: "completed" },
@@ -158,8 +164,8 @@ const getUploadStatus = async (req, res) => {
     }
 };
 exports.getUploadStatus = getUploadStatus;
-const activeConnections = new Map();
-const uploadProgressSSE = (req, res) => {
+const activeLogConnections = new Map();
+const uploadLogsSSE = (req, res) => {
     const { id } = req.params;
     const uploadId = parseInt(id, 10);
     if (isNaN(uploadId)) {
@@ -169,17 +175,17 @@ const uploadProgressSSE = (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
-    activeConnections.set(uploadId, res);
+    activeLogConnections.set(uploadId, res);
     req.on("close", () => {
-        activeConnections.delete(uploadId);
+        activeLogConnections.delete(uploadId);
     });
 };
-exports.uploadProgressSSE = uploadProgressSSE;
-const sendProgressUpdate = (uploadId, progress) => {
-    const connection = activeConnections.get(uploadId);
+exports.uploadLogsSSE = uploadLogsSSE;
+const sendLogUpdate = (uploadId, log) => {
+    const connection = activeLogConnections.get(uploadId);
     if (connection) {
-        connection.write(`data: ${JSON.stringify({ progress })}\n\n`);
+        connection.write(`data: ${JSON.stringify({ log })}\n\n`);
     }
 };
-exports.sendProgressUpdate = sendProgressUpdate;
+exports.sendLogUpdate = sendLogUpdate;
 //# sourceMappingURL=uploadController.js.map

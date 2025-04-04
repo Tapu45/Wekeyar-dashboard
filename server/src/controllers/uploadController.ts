@@ -67,27 +67,29 @@ export const uploadExcelFile = async (req: Request, res: Response): Promise<void
     });
 
     worker.on("message", async (message) => {
-      if (message.status === "completed") {
-        // Update the status to "completed" in the UploadHistory table
+      if (message.status === "log") {
+        // Forward log updates to the frontend via SSE
+        sendLogUpdate(uploadHistory.id, message.log);
+      } else if (message.status === "progress") {
+        // Optionally handle progress updates
+        sendLogUpdate(uploadHistory.id, `Progress: ${message.progress}%`);
+      } else if (message.status === "completed") {
+        // Handle completion
         await prisma.uploadHistory.update({
           where: { id: uploadHistory.id },
           data: { status: "completed" },
         });
-
-       
         res.status(200).json({
           success: true,
           message: "File processed successfully",
           stats: message.stats || {},
         });
       } else if (message.status === "error") {
-        // Update the status to "failed" in the UploadHistory table
+        // Handle errors
         await prisma.uploadHistory.update({
           where: { id: uploadHistory.id },
           data: { status: "failed" },
         });
-
-  
         res.status(500).json({
           success: false,
           message: message.error,
@@ -195,9 +197,9 @@ export const getUploadStatus = async (req: Request, res: Response): Promise<void
 };
 
 
-const activeConnections: Map<number, Response> = new Map(); // Track active SSE connections by upload ID
+const activeLogConnections: Map<number, Response> = new Map(); // Track active SSE connections by upload ID
 
-export const uploadProgressSSE = (req: Request, res: Response): void => {
+export const uploadLogsSSE = (req: Request, res: Response): void => {
   const { id } = req.params;
   const uploadId = parseInt(id, 10);
 
@@ -212,18 +214,18 @@ export const uploadProgressSSE = (req: Request, res: Response): void => {
   res.setHeader("Connection", "keep-alive");
 
   // Add the connection to the active connections map
-  activeConnections.set(uploadId, res);
+  activeLogConnections.set(uploadId, res);
 
   // Handle client disconnect
   req.on("close", () => {
-    activeConnections.delete(uploadId);
+    activeLogConnections.delete(uploadId);
   });
 };
 
-// Function to send progress updates to the client
-export const sendProgressUpdate = (uploadId: number, progress: number): void => {
-  const connection = activeConnections.get(uploadId);
+// Function to send log updates to the client
+export const sendLogUpdate = (uploadId: number, log: string): void => {
+  const connection = activeLogConnections.get(uploadId);
   if (connection) {
-    connection.write(`data: ${JSON.stringify({ progress })}\n\n`);
+    connection.write(`data: ${JSON.stringify({ log })}\n\n`);
   }
 };

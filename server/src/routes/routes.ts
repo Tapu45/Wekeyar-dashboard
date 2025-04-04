@@ -27,4 +27,5 @@ router.get("/upload-status", getUploadStatusByMonth);
 
 router.get("/customer/:customerId/purchase-history", getCustomerPurchaseHistory);
 
+
 export default router;

@@ -32,6 +32,7 @@ const FileUpload: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"recent" | "all">("recent");
   const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
+  const [logs, setLogs] = useState<string[]>([]); // State to store logs
 
 
   // Fetch upload history on component mount
@@ -39,8 +40,6 @@ const FileUpload: React.FC = () => {
     fetchUploadHistory();
   }, []);
 
- 
-  
 
   const fetchUploadHistory = async () => {
     setIsLoading(true);
@@ -56,6 +55,26 @@ const FileUpload: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const fetchLogs = (uploadId: string) => {
+    const eventSource = new EventSource(
+      API_ROUTES.UPLOAD_LOGS.replace(":id", uploadId)
+    );
+  
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      setLogs((prevLogs) => [...prevLogs, data.log]); // Append new logs
+    };
+  
+    eventSource.onerror = () => {
+      console.error("Error connecting to log stream");
+      eventSource.close();
+    };
+  
+    return () => {
+      eventSource.close();
+    };
   };
 
   const handleDeleteHistory = async (id: string | null) => {
@@ -82,6 +101,8 @@ const FileUpload: React.FC = () => {
     setError(null);
     setUploadResult(null);
   };
+
+  
 
   const handleUpload = async () => {
     if (!file) {
@@ -750,8 +771,11 @@ const FileUpload: React.FC = () => {
   const toggleFileDetails = (id: string) => {
     if (expandedFileId === id) {
       setExpandedFileId(null);
+      setLogs([]); // Clear logs when collapsing
     } else {
       setExpandedFileId(id);
+      setLogs([]); // Clear previous logs
+      fetchLogs(id); // Fetch logs for the selected file
     }
   };
 
@@ -1148,6 +1172,21 @@ const FileUpload: React.FC = () => {
                                 </div>
                               </div>
                             </div>
+                             {/* Logs Section */}
+        <div className="mt-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">Logs</h4>
+          <div className="bg-white rounded-lg border border-gray-100 p-4 max-h-40 overflow-y-auto custom-scrollbar">
+            {logs.length === 0 ? (
+              <p className="text-gray-500 text-sm">No logs available yet...</p>
+            ) : (
+              logs.map((log, index) => (
+                <p key={index} className="text-sm text-gray-700">
+                  {log}
+                </p>
+              ))
+            )}
+          </div>
+        </div>
                             <div className="flex justify-end mt-2">
                               <button
                                 onClick={() => handleDeleteHistory(history.id)} // Pass the history ID to delete a specific record

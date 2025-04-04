@@ -1,6 +1,6 @@
 import express from 'express';
 import { uploadMiddleware } from '../middleware';
-import { uploadExcelFile, getUploadHistory, getUploadStatus, deleteUploadHistory } from '../controllers/uploadController';
+import { uploadExcelFile, getUploadHistory, getUploadStatus, deleteUploadHistory, uploadLogsSSE } from '../controllers/uploadController';
 
 const router = express.Router();
 
@@ -23,5 +23,6 @@ router.get('/upload/history', getUploadHistory);
 router.delete("/upload/history/:id?", deleteUploadHistory);
 
 router.get("/upload/status/:id", getUploadStatus);
+router.get("/upload/logs/:id", uploadLogsSSE);
 
 export default router;

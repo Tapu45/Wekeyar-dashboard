@@ -41,15 +41,26 @@ function getFileExtension(url) {
     const filename = url.split('/').pop().split('?')[0];
     return path.extname(filename).toLowerCase();
 }
+function detectFileType(buffer) {
+    const header = buffer.slice(0, 8).toString('hex');
+    if (header.startsWith('504b0304')) {
+        return '.xlsx';
+    }
+    else if (header.startsWith('d0cf11e0')) {
+        return '.xls';
+    }
+    return '.xls';
+}
 async function convertXlsToXlsxIfNeeded(fileUrl) {
-    console.log(`Checking if file conversion is needed for: ${fileUrl}`);
-    const extension = getFileExtension(fileUrl);
+    console.log(`Downloading file from: ${fileUrl}`);
     const response = await axios({
         method: 'get',
         url: fileUrl,
         responseType: 'arraybuffer'
     });
-    if (extension !== '.xls') {
+    const fileType = detectFileType(response.data);
+    console.log(`Detected file type: ${fileType}`);
+    if (fileType === '.xlsx') {
         console.log('File is already in XLSX format, no conversion needed');
         return { buffer: response.data, needsConversion: false };
     }

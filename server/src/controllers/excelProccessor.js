@@ -48,20 +48,40 @@ function getFileExtension(url) {
   return path.extname(filename).toLowerCase();
 }
 
-// Function to convert XLS to XLSX if needed
+// Enhanced function to detect file type based on content, not just URL
+function detectFileType(buffer) {
+  // Check file signature (magic numbers)
+  const header = buffer.slice(0, 8).toString('hex');
+  
+  // XLSX signature (PKZip format)
+  if (header.startsWith('504b0304')) {
+    return '.xlsx';
+  }
+  // XLS signature (Compound File Binary Format)
+  else if (header.startsWith('d0cf11e0')) {
+    return '.xls';
+  }
+  // If can't detect by signature, default to XLS for safety
+  return '.xls';
+}
+
+// Improved function to convert XLS to XLSX if needed
 async function convertXlsToXlsxIfNeeded(fileUrl) {
-  console.log(`Checking if file conversion is needed for: ${fileUrl}`);
-  const extension = getFileExtension(fileUrl);
+  console.log(`Downloading file from: ${fileUrl}`);
   
   // Download the file
   const response = await axios({
     method: 'get',
     url: fileUrl,
-    responseType: 'arraybuffer' // Use arraybuffer to handle binary data
+    responseType: 'arraybuffer' 
   });
   
-  // If it's already xlsx, just return the buffer
-  if (extension !== '.xls') {
+  // Detect file type from content, not URL
+  const fileType = detectFileType(response.data);
+  console.log(`Detected file type: ${fileType}`);
+  
+  // If it's already XLSX, just return the buffer
+  if (fileType === '.xlsx') {
     console.log('File is already in XLSX format, no conversion needed');
     return { buffer: response.data, needsConversion: false };
   }

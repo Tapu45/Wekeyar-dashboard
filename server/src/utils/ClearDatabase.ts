@@ -19,7 +19,22 @@ async function clearDatabase() {
     await prisma.product.deleteMany(); // Clear products
     await prisma.user.deleteMany(); // Clear users
 
-    console.log('Database cleared successfully.');
+    console.log('Resetting auto-increment IDs...');
+
+    // Reset auto-increment IDs for each table
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "BillDetails_id_seq" RESTART WITH 1`);
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "Bill_id_seq" RESTART WITH 1`);
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "TelecallingOrderDetails_id_seq" RESTART WITH 1`);
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "TelecallingOrder_id_seq" RESTART WITH 1`);
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "TelecallerHandledCustomer_id_seq" RESTART WITH 1`);
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "TelecallingCustomer_id_seq" RESTART WITH 1`);
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "UploadHistory_id_seq" RESTART WITH 1`);
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "Customer_id_seq" RESTART WITH 1`);
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "Store_id_seq" RESTART WITH 1`);
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "Product_id_seq" RESTART WITH 1`);
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "User_id_seq" RESTART WITH 1`);
+
+    console.log('Database cleared and auto-increment IDs reset successfully.');
   } catch (error) {
     console.error('Error clearing database:', error);
   } finally {

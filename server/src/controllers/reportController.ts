@@ -282,7 +282,7 @@ export const getCustomerReport = async (
 
       // Update total bills and total amount
       customerEntry.totalBills += 1;
-      customerEntry.totalAmount += bill.amountPaid; // Use amountPaid instead of netAmount
+      customerEntry.totalAmount += bill.amountPaid - bill.creditAmount; // Use amountPaid instead of netAmount
 
       // Group bills by date
       const dateKey = bill.date.toISOString().split("T")[0];
@@ -296,13 +296,13 @@ export const getCustomerReport = async (
       }
 
       const dateEntry = customerEntry.dates.get(dateKey);
-      dateEntry.totalAmount += bill.amountPaid; // Use amountPaid instead of netAmount
+      dateEntry.totalAmount += bill.amountPaid - bill.creditAmount; // Use amountPaid instead of netAmount
 
       // Group bills into sales or returns based on billNo prefix
       if (bill.billNo.startsWith("CS")) {
         dateEntry.salesBills.push({
           billNo: bill.billNo,
-          amount: bill.amountPaid,
+          amount: bill.amountPaid - bill.creditAmount, // Use amountPaid instead of netAmount
           medicines: bill.billDetails.map((detail) => ({
             name: detail.item,
             quantity: detail.quantity,
@@ -311,7 +311,7 @@ export const getCustomerReport = async (
       } else if (bill.billNo.startsWith("CN")) {
         dateEntry.returnBills.push({
           billNo: bill.billNo,
-          amount: bill.amountPaid,
+          amount: bill.amountPaid + bill.creditAmount, // Use amountPaid instead of netAmount
           medicines: bill.billDetails.map((detail) => ({
             name: detail.item,
             quantity: detail.quantity,
@@ -377,8 +377,8 @@ export const getStoreWiseSalesReport = async (
           },
         },
         select: {
-          netAmount: true,
-          isUploaded: true,
+          amountPaid: true,
+          creditAmount: true,
           createdAt: true, // Fetch the creation date for upload tracking
           billDetails: {
             select: {
@@ -388,19 +388,25 @@ export const getStoreWiseSalesReport = async (
         },
       });
 
+      // Calculate total amount using the consistent logic
+      const totalNetAmount = sales.reduce(
+        (sum, bill) => sum + (bill.amountPaid - bill.creditAmount),
+        0
+      );
+
       // Find the last upload date
       const lastUploadDate = sales.length > 0
         ? sales.reduce((latest, bill) => (bill.createdAt > latest ? bill.createdAt : latest), sales[0].createdAt)
         : null;
 
       return {
-        totalNetAmount: sales.reduce((sum, bill) => sum + bill.netAmount, 0),
+        totalNetAmount,
         totalBills: sales.length,
         totalItemsSold: sales.reduce(
           (sum, bill) => sum + bill.billDetails.length,
           0
         ),
-        isUploaded: sales.length > 0 ? sales[0].isUploaded : false,
+        isUploaded: sales.length > 0 ? true : false,
         lastUploadDate: lastUploadDate ? lastUploadDate.toISOString() : null, // Format the date
       };
     };
@@ -643,18 +649,21 @@ export const getCustomerPurchaseHistory = async (req: Request, res: Response): P
       if (!acc[monthKey]) {
         acc[monthKey] = { totalAmount: 0, totalBills: 0, dailyData: {} };
       }
-      acc[monthKey].totalAmount += bill.netAmount;
-      acc[monthKey].totalBills += 1;
+    // Calculate the bill amount as amountPaid - creditAmount
+    const billAmount = bill.amountPaid - bill.creditAmount;
+
+    acc[monthKey].totalAmount += billAmount;
+    acc[monthKey].totalBills += 1;
 
       // Group data by day
       const dayKey = bill.date.toISOString().split("T")[0];
       if (!acc[monthKey].dailyData[dayKey]) {
         acc[monthKey].dailyData[dayKey] = { totalAmount: 0, bills: [] };
       }
-      acc[monthKey].dailyData[dayKey].totalAmount += bill.netAmount;
+      acc[monthKey].dailyData[dayKey].totalAmount += billAmount;
       acc[monthKey].dailyData[dayKey].bills.push({
         billNo: bill.billNo,
-        amount: bill.netAmount,
+        amount: billAmount,
         medicines: bill.billDetails.map((detail) => ({
           name: detail.item,
           quantity: detail.quantity,

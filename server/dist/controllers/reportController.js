@@ -204,7 +204,7 @@ const getCustomerReport = async (req, res) => {
             }
             const customerEntry = customerData.get(id);
             customerEntry.totalBills += 1;
-            customerEntry.totalAmount += bill.amountPaid;
+            customerEntry.totalAmount += bill.amountPaid - bill.creditAmount;
             const dateKey = bill.date.toISOString().split("T")[0];
             if (!customerEntry.dates.has(dateKey)) {
                 customerEntry.dates.set(dateKey, {
@@ -215,11 +215,11 @@ const getCustomerReport = async (req, res) => {
                 });
             }
             const dateEntry = customerEntry.dates.get(dateKey);
-            dateEntry.totalAmount += bill.amountPaid;
+            dateEntry.totalAmount += bill.amountPaid - bill.creditAmount;
             if (bill.billNo.startsWith("CS")) {
                 dateEntry.salesBills.push({
                     billNo: bill.billNo,
-                    amount: bill.amountPaid,
+                    amount: bill.amountPaid - bill.creditAmount,
                     medicines: bill.billDetails.map((detail) => ({
                         name: detail.item,
                         quantity: detail.quantity,
@@ -229,7 +229,7 @@ const getCustomerReport = async (req, res) => {
             else if (bill.billNo.startsWith("CN")) {
                 dateEntry.returnBills.push({
                     billNo: bill.billNo,
-                    amount: bill.amountPaid,
+                    amount: bill.amountPaid + bill.creditAmount,
                     medicines: bill.billDetails.map((detail) => ({
                         name: detail.item,
                         quantity: detail.quantity,
@@ -278,8 +278,8 @@ const getStoreWiseSalesReport = async (req, res) => {
                     },
                 },
                 select: {
-                    netAmount: true,
-                    isUploaded: true,
+                    amountPaid: true,
+                    creditAmount: true,
                     createdAt: true,
                     billDetails: {
                         select: {
@@ -288,14 +288,15 @@ const getStoreWiseSalesReport = async (req, res) => {
                     },
                 },
             });
+            const totalNetAmount = sales.reduce((sum, bill) => sum + (bill.amountPaid - bill.creditAmount), 0);
             const lastUploadDate = sales.length > 0
                 ? sales.reduce((latest, bill) => (bill.createdAt > latest ? bill.createdAt : latest), sales[0].createdAt)
                 : null;
             return {
-                totalNetAmount: sales.reduce((sum, bill) => sum + bill.netAmount, 0),
+                totalNetAmount,
                 totalBills: sales.length,
                 totalItemsSold: sales.reduce((sum, bill) => sum + bill.billDetails.length, 0),
-                isUploaded: sales.length > 0 ? sales[0].isUploaded : false,
+                isUploaded: sales.length > 0 ? true : false,
                 lastUploadDate: lastUploadDate ? lastUploadDate.toISOString() : null,
             };
         };
@@ -478,16 +479,17 @@ const getCustomerPurchaseHistory = async (req, res) => {
             if (!acc[monthKey]) {
                 acc[monthKey] = { totalAmount: 0, totalBills: 0, dailyData: {} };
             }
-            acc[monthKey].totalAmount += bill.netAmount;
+            const billAmount = bill.amountPaid - bill.creditAmount;
+            acc[monthKey].totalAmount += billAmount;
             acc[monthKey].totalBills += 1;
             const dayKey = bill.date.toISOString().split("T")[0];
             if (!acc[monthKey].dailyData[dayKey]) {
                 acc[monthKey].dailyData[dayKey] = { totalAmount: 0, bills: [] };
             }
-            acc[monthKey].dailyData[dayKey].totalAmount += bill.netAmount;
+            acc[monthKey].dailyData[dayKey].totalAmount += billAmount;
             acc[monthKey].dailyData[dayKey].bills.push({
                 billNo: bill.billNo,
-                amount: bill.netAmount,
+                amount: billAmount,
                 medicines: bill.billDetails.map((detail) => ({
                     name: detail.item,
                     quantity: detail.quantity,

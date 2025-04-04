@@ -8,6 +8,7 @@ const path = require('path');
 const stream = require('stream');
 const { promisify } = require('util');
 const pipeline = promisify(stream.pipeline);
+const XLSX = require('xlsx');
 const prisma = new PrismaClient({
     log: ['error'],
     datasources: {
@@ -36,6 +37,34 @@ async function executeWithRetry(operation, maxRetries = 3) {
     }
     throw lastError;
 }
+function getFileExtension(url) {
+    const filename = url.split('/').pop().split('?')[0];
+    return path.extname(filename).toLowerCase();
+}
+async function convertXlsToXlsxIfNeeded(fileUrl) {
+    console.log(`Checking if file conversion is needed for: ${fileUrl}`);
+    const extension = getFileExtension(fileUrl);
+    const response = await axios({
+        method: 'get',
+        url: fileUrl,
+        responseType: 'arraybuffer'
+    });
+    if (extension !== '.xls') {
+        console.log('File is already in XLSX format, no conversion needed');
+        return { buffer: response.data, needsConversion: false };
+    }
+    console.log('Converting XLS file to XLSX format');
+    try {
+        const workbook = XLSX.read(response.data, { type: 'buffer' });
+        const xlsxBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+        console.log('XLS to XLSX conversion successful');
+        return { buffer: xlsxBuffer, needsConversion: true };
+    }
+    catch (error) {
+        console.error('Error converting XLS to XLSX:', error);
+        throw new Error(`Failed to convert XLS to XLSX: ${error.message}`);
+    }
+}
 async function processExcelFile() {
     const DEFAULT_PHONE = "9999999999";
     const DEFAULT_NAME = "Cashlist Customer";
@@ -43,11 +72,13 @@ async function processExcelFile() {
     try {
         const { fileUrl } = workerData;
         console.log(`Downloading file from Cloudinary: ${fileUrl}`);
-        const response = await axios({
-            method: 'get',
-            url: fileUrl,
-            responseType: 'stream'
-        });
+        const { buffer, needsConversion } = await convertXlsToXlsxIfNeeded(fileUrl);
+        if (needsConversion) {
+            console.log('Using converted XLSX file for processing');
+        }
+        else {
+            console.log('Using original file for processing');
+        }
         const startTime = Date.now();
         const storeMap = new Map();
         const customerMap = new Map();
@@ -70,7 +101,7 @@ async function processExcelFile() {
         let lastProgressUpdate = 0;
         const workbook = new ExcelJS.Workbook();
         console.time('Excel parsing');
-        await workbook.xlsx.read(response.data);
+        await workbook.xlsx.load(buffer);
         console.log('File downloaded and loaded into memory.');
         const worksheet = workbook.getWorksheet(1);
         rowCount = worksheet.rowCount;

@@ -278,7 +278,7 @@ const InactiveCustomerList: React.FC<InactiveCustomerListProps> = ({
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] =
+  
     useState<InactiveCustomer | null>(null);
 
   const handleCustomerClick = useCallback(
@@ -304,9 +304,7 @@ const InactiveCustomerList: React.FC<InactiveCustomerListProps> = ({
     [expandedCustomerId]
   );
 
-  const handleOrderClick = (customer: InactiveCustomer) => {
-    setSelectedCustomer(customer); // Open the OrderForm for the selected customer
-  };
+ 
 
  
 

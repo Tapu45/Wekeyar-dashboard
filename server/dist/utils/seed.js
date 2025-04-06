@@ -1,29 +1,66 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const client_1 = require("@prisma/client");
-const prisma = new client_1.PrismaClient();
-async function main() {
-    console.log("Seeding products...");
-    const products = [
-        { name: "Product A", description: "Description for Product A", price: 10.0 },
-        { name: "Product B", description: "Description for Product B", price: 20.0 },
-        { name: "Product C", description: "Description for Product C", price: 30.0 },
-    ];
-    for (const product of products) {
-        await prisma.product.upsert({
-            where: { name: product.name },
-            update: {},
-            create: product,
+const axios = require('axios');
+const sampleBill = `Creating bill RUCH/0167
+06-04-2025
+OMM PRAKASHGHJfgg
+001 TIME: 15:30
+7205696364
+CASH BILL
+RUCHIKA
+BHUBANESWAR
+7205959341
+ODRET00532/R ODRET00533/RC
+21AACCW4774G1ZD
+2:0
+PARACETAMOL 500MG
+3004
+10112
+10/26
+50.00
+10.00
+5.00
+5.00
+35.00
+50.00
+1:0
+IBUPROFEN 400MG TAB
+3004
+240776
+9/26
+75.00
+15.00
+5.00
+5.00
+50.00
+75.00
+Rs. Eighty Five Only
+125.00
+25.00
+100.00
+Our Software MARG Erp 9437026823,7978789800`;
+async function testPostDailyBills() {
+    try {
+        const response = await axios.post('http://localhost:4000/api/upload/daily/bill', {
+            bill: sampleBill
         });
+        console.log('Response:', response.data);
+        if (response.data.success) {
+            console.log('✅ Test passed! Bill created successfully.');
+            console.log('Bill ID:', response.data.billId);
+            console.log('Parsed Data:', JSON.stringify(response.data.parsedData, null, 2));
+        }
+        else {
+            console.log('❌ Test failed! Could not create bill.');
+        }
     }
-    console.log("Seeding completed.");
+    catch (error) {
+        if (error instanceof Error) {
+            console.error('❌ Test failed with error:', error.message);
+        }
+        else {
+            console.error('❌ Test failed with an unknown error:', error);
+        }
+    }
 }
-main()
-    .catch((e) => {
-    console.error(e);
-    process.exit(1);
-})
-    .finally(async () => {
-    await prisma.$disconnect();
-});
+testPostDailyBills();
 //# sourceMappingURL=seed.js.map

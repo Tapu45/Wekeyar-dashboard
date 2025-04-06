@@ -16,122 +16,117 @@ async function postDailyBills(req, res) {
         const billData = {
             items: []
         };
-        let currentItem = {};
-        let isItemSection = false;
-        let lineIndex = 0;
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            const actualLine = line.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
-            if (actualLine && /\/\d+$/.test(actualLine)) {
-                billData.billNo = actualLine;
-                lineIndex = i + 1;
+        const cleanedLines = lines.map((line) => {
+            return line.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
+        }).filter((line) => line !== '');
+        for (let i = 0; i < cleanedLines.length; i++) {
+            const line = cleanedLines[i];
+            if (line.includes("Creating bill")) {
+                billData.billNo = line.replace("Creating bill", "").trim();
+                break;
+            }
+            else if (line && /\/\d+$/.test(line)) {
+                billData.billNo = line;
                 break;
             }
         }
-        for (let i = lineIndex; i < lines.length; i++) {
-            const line = lines[i].trim();
-            const actualLine = line.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
-            if (!actualLine)
-                continue;
-            if (actualLine.match(/^\d{2}-\d{2}-\d{4}$/)) {
-                const [day, month, year] = actualLine.split('-');
-                billData.date = new Date(`${year}-${month}-${day}`);
-                continue;
-            }
-            if (!billData.customerName && actualLine && !actualLine.includes("TIME:") && !actualLine.match(/^\d+$/)) {
-                billData.customerName = actualLine;
-                continue;
-            }
-            if (actualLine.match(/^\d{10}$/) && !billData.customerPhone) {
-                billData.customerPhone = actualLine;
-                continue;
-            }
-            if (actualLine.includes("BILL")) {
-                billData.paymentType = actualLine.toLowerCase().includes("cash") ? "cash" : actualLine;
-                continue;
-            }
-            if (!billData.storeName && billData.customerName && actualLine && !actualLine.match(/^\d+$/)) {
-                billData.storeName = actualLine;
-                continue;
-            }
-            if (billData.storeName && !billData.storeLocation && actualLine && !actualLine.match(/^\d+$/)) {
-                billData.storeLocation = actualLine;
-                continue;
-            }
-            if (actualLine.match(/^\d{10}$/) && billData.customerPhone && !billData.storePhone && actualLine !== billData.customerPhone) {
-                billData.storePhone = actualLine;
-                continue;
-            }
-            if (actualLine.match(/^Rs\.|^₹/) && actualLine.includes("Only")) {
-                billData.amountText = actualLine;
-                let amountCount = 0;
-                for (let j = i + 1; j < i + 5 && j < lines.length; j++) {
-                    const amountLine = lines[j].trim();
-                    const actualAmountLine = amountLine.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
-                    if (actualAmountLine.match(/^\d+\.\d{2}$/)) {
-                        const amount = parseFloat(actualAmountLine);
-                        amountCount++;
-                        if (amountCount === 1) {
-                            billData.calculatedAmount = amount;
-                        }
-                        else if (amountCount === 2) {
-                            billData.netDiscount = amount;
-                            billData.creditAmount = amount;
-                        }
-                        else if (amountCount === 3) {
-                            billData.amountPaid = amount;
-                            break;
-                        }
-                    }
-                }
-                i += amountCount;
-                continue;
-            }
-            if (actualLine.match(/^\d+$/) && !isItemSection && i > 10) {
-                isItemSection = true;
-                currentItem = {
-                    quantity: parseInt(actualLine)
-                };
-                continue;
-            }
-            if (isItemSection) {
-                if (!currentItem.item) {
-                    currentItem.item = actualLine;
-                    continue;
-                }
-                if (!currentItem.batch && actualLine.match(/^\d+$/)) {
-                    currentItem.batch = actualLine;
-                    continue;
-                }
-                if (currentItem.batch && !currentItem.expBatch && actualLine.match(/\d+\/\d+/)) {
-                    currentItem.expBatch = actualLine;
-                    continue;
-                }
-                if (currentItem.expBatch && !currentItem.mrp && actualLine.match(/^\d+\.\d{2}$/)) {
-                    currentItem.mrp = parseFloat(actualLine);
-                    continue;
-                }
-                if (currentItem.mrp && !currentItem.discount && actualLine.match(/^\d+\.\d{2}$|^\d+$/)) {
-                    currentItem.discount = parseFloat(actualLine);
-                    billData.items.push(currentItem);
-                    currentItem = {};
-                    if (i + 1 < lines.length) {
-                        const nextLine = lines[i + 1].trim();
-                        const nextActualLine = nextLine.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
-                        if (nextActualLine.match(/^\d+$/)) {
-                            currentItem = {
-                                quantity: parseInt(nextActualLine)
-                            };
-                            i++;
-                        }
-                        else if (nextActualLine.match(/^\d+:\d+$/)) {
-                            isItemSection = false;
-                        }
-                    }
-                    continue;
-                }
+        const dateIndex = cleanedLines.findIndex((line) => line.match(/^\d{2}-\d{2}-\d{4}$/));
+        if (dateIndex !== -1) {
+            const [day, month, year] = cleanedLines[dateIndex].split('-');
+            billData.date = new Date(`${year}-${month}-${day}`);
+        }
+        else {
+            billData.date = new Date();
+        }
+        const nameIndex = dateIndex !== -1 ? dateIndex + 1 : 0;
+        if (nameIndex < cleanedLines.length && !cleanedLines[nameIndex].startsWith("TIME:") &&
+            !cleanedLines[nameIndex].match(/^\d{10}$/)) {
+            billData.customerName = cleanedLines[nameIndex];
+        }
+        const phoneIndex = cleanedLines.findIndex((line) => line.match(/^\d{10}$/));
+        if (phoneIndex !== -1) {
+            billData.customerPhone = cleanedLines[phoneIndex];
+        }
+        const paymentIndex = cleanedLines.findIndex((line) => line.includes("BILL"));
+        if (paymentIndex !== -1) {
+            billData.paymentType = cleanedLines[paymentIndex].toLowerCase().includes("cash") ? "cash" : cleanedLines[paymentIndex];
+        }
+        if (paymentIndex !== -1 && paymentIndex + 1 < cleanedLines.length) {
+            billData.storeName = cleanedLines[paymentIndex + 1];
+            if (paymentIndex + 2 < cleanedLines.length) {
+                billData.storeLocation = cleanedLines[paymentIndex + 2];
             }
         }
+        const storePhoneIndex = cleanedLines.findIndex((line, index) => line.match(/^\d{10}$/) && index > phoneIndex && line !== billData.customerPhone);
+        if (storePhoneIndex !== -1) {
+            billData.storePhone = cleanedLines[storePhoneIndex];
+        }
+        const amountTextIndex = cleanedLines.findIndex((line) => (line.startsWith("Rs.") || line.startsWith("₹")) && line.includes("Only"));
+        if (amountTextIndex !== -1) {
+            billData.amountText = cleanedLines[amountTextIndex];
+            const totalAmountIndex = amountTextIndex + 1;
+            const discountIndex = amountTextIndex + 2;
+            const finalAmountIndex = amountTextIndex + 3;
+            if (totalAmountIndex < cleanedLines.length &&
+                cleanedLines[totalAmountIndex].match(/^\d+\.\d{2}$/)) {
+                billData.calculatedAmount = parseFloat(cleanedLines[totalAmountIndex]);
+            }
+            if (discountIndex < cleanedLines.length &&
+                cleanedLines[discountIndex].match(/^\d+\.\d{2}$/)) {
+                billData.netDiscount = parseFloat(cleanedLines[discountIndex]);
+                billData.creditAmount = parseFloat(cleanedLines[discountIndex]);
+            }
+            if (finalAmountIndex < cleanedLines.length &&
+                cleanedLines[finalAmountIndex].match(/^\d+\.\d{2}$/)) {
+                billData.amountPaid = billData.calculatedAmount;
+            }
+        }
+        const medicineItems = [];
+        const itemStartIndices = [];
+        cleanedLines.forEach((line, index) => {
+            if ((line.match(/^[1-9]$/) || line.match(/^[1-9]:[0-9]$/)) &&
+                index < cleanedLines.length - 5) {
+                itemStartIndices.push(index);
+            }
+        });
+        for (let i = 0; i < itemStartIndices.length; i++) {
+            const startIndex = itemStartIndices[i];
+            const endIndex = i < itemStartIndices.length - 1
+                ? itemStartIndices[i + 1]
+                : cleanedLines.length;
+            const itemLines = cleanedLines.slice(startIndex, endIndex);
+            if (itemLines.length < 6)
+                continue;
+            const quantity = parseInt(itemLines[0]);
+            if (isNaN(quantity))
+                continue;
+            const itemName = itemLines[1];
+            const batchIndex = itemLines.findIndex((line, idx) => idx > 1 && line.match(/^\d+$/));
+            if (batchIndex === -1)
+                continue;
+            const expiryIndex = itemLines.findIndex((line, idx) => idx > batchIndex && line.match(/^\d{1,2}\/\d{2,4}$/));
+            if (expiryIndex === -1)
+                continue;
+            const mrpIndex = itemLines.findIndex((line, idx) => idx > expiryIndex && line.match(/^\d+\.\d{2}$/));
+            if (mrpIndex === -1)
+                continue;
+            const discountIndex = itemLines.findIndex((line, idx) => idx > mrpIndex && line.match(/^\d+(\.\d{2})?$/));
+            if (discountIndex === -1)
+                continue;
+            const item = {
+                quantity,
+                item: itemName,
+                batch: itemLines[batchIndex],
+                expBatch: itemLines[expiryIndex],
+                mrp: parseFloat(itemLines[mrpIndex]),
+                discount: parseFloat(itemLines[discountIndex])
+            };
+            medicineItems.push(item);
+        }
+        if (medicineItems.length > 0) {
+            billData.items = medicineItems;
+        }
+        console.log("Extracted items:", billData.items);
         let customer = await prisma.customer.findUnique({
             where: { phone: billData.customerPhone }
         });
@@ -139,7 +134,7 @@ async function postDailyBills(req, res) {
             customer = await prisma.customer.create({
                 data: {
                     name: billData.customerName || "Unknown Customer",
-                    phone: billData.customerPhone || "0000000000",
+                    phone: billData.customerPhone || `Unknown-${Date.now()}`,
                     address: null,
                 }
             });
@@ -150,12 +145,23 @@ async function postDailyBills(req, res) {
         if (!store) {
             store = await prisma.store.create({
                 data: {
-                    storeName: billData.storeName || "Unknown Store",
+                    storeName: billData.storeName,
                     address: billData.storeLocation || null,
                     phone: billData.storePhone || null,
                 }
             });
         }
+        const billDetails = billData.items.map((item) => {
+            return {
+                item: item.item || "Unknown Item",
+                quantity: item.quantity || 1,
+                batch: item.batch || "",
+                expBatch: item.expBatch || "",
+                mrp: item.mrp || 0,
+                discount: item.discount || 0,
+            };
+        });
+        console.log("Creating bill details:", billDetails);
         const newBill = await prisma.bill.create({
             data: {
                 billNo: billData.billNo || `UNKNOWN-${Date.now()}`,
@@ -164,27 +170,24 @@ async function postDailyBills(req, res) {
                 date: billData.date || new Date(),
                 netDiscount: billData.netDiscount || 0,
                 netAmount: 0,
-                amountPaid: billData.amountPaid || 0,
-                creditAmount: billData.creditAmount || 0,
+                amountPaid: billData.calculatedAmount || 0,
+                creditAmount: billData.netDiscount || 0,
                 paymentType: billData.paymentType || "cash",
                 isUploaded: true,
                 billDetails: {
-                    create: billData.items.map((item) => ({
-                        item: item.item || "Unknown Item",
-                        quantity: item.quantity || 1,
-                        batch: item.batch || "",
-                        expBatch: item.expBatch || "",
-                        mrp: item.mrp || 0,
-                        discount: item.discount || 0,
-                    }))
+                    create: billDetails
                 }
+            },
+            include: {
+                billDetails: true
             }
         });
         res.status(200).json({
             success: true,
             message: `Bill ${billData.billNo} created successfully`,
             billId: newBill.id,
-            parsedData: billData
+            parsedData: billData,
+            billWithDetails: newBill
         });
     }
     catch (error) {

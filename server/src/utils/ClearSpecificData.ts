@@ -7,8 +7,8 @@ async function clearSpecificData() {
     console.log('Starting to clear specific data...');
 
     // Define the date range for November 2024
-    const startDate = new Date('2024-12-01T00:00:00.000Z');
-    const endDate = new Date('2024-12-30T23:59:59.999Z');
+    const startDate = new Date('2025-04-06T00:00:00.000Z');
+    const endDate = new Date('2025-04-06T23:59:59.999Z');
 
     // Step 1: Find all bills in November 2024
     const billsToDelete = await prisma.bill.findMany({

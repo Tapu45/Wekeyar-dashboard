@@ -1,1 +1,3 @@
-export {};
+declare const axios: any;
+declare const sampleBill = "Creating bill RUCH/0167\n06-04-2025\nOMM PRAKASHGHJfgg\n001 TIME: 15:30\n7205696364\nCASH BILL\nRUCHIKA\nBHUBANESWAR\n7205959341\nODRET00532/R ODRET00533/RC\n21AACCW4774G1ZD\n2:0\nPARACETAMOL 500MG\n3004\n10112\n10/26\n50.00\n10.00\n5.00\n5.00\n35.00\n50.00\n1:0\nIBUPROFEN 400MG TAB\n3004\n240776\n9/26\n75.00\n15.00\n5.00\n5.00\n50.00\n75.00\nRs. Eighty Five Only\n125.00\n25.00\n100.00\nOur Software MARG Erp 9437026823,7978789800";
+declare function testPostDailyBills(): Promise<void>;

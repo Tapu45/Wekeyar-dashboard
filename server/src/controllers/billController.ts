@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 
-
 export async function postDailyBills(req: Request, res: Response): Promise<void> {
   const prisma = new PrismaClient();
   const { bill } = req.body;
@@ -10,7 +9,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
     // validate body
     if (!bill) {
       console.log("Invalid request body", bill);
-     res.status(400).json({ error: "Invalid request body" });
+      res.status(400).json({ error: "Invalid request body" });
       return;
     }
 
@@ -22,162 +21,178 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
       items: []
     };
 
-    let currentItem: any = {};
-    let isItemSection = false;
-    let lineIndex = 0;
-    
-    // Extract bill number from the first meaningful line
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const actualLine = line.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
+    // Clean up log timestamps from each line
+    const cleanedLines = lines.map((line: string) => {
+      return line.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
+    }).filter((line: string) => line !== '');
+
+    // Extract bill number
+    for (let i = 0; i < cleanedLines.length; i++) {
+      const line = cleanedLines[i];
       
-      if (actualLine && /\/\d+$/.test(actualLine)) {
-        billData.billNo = actualLine;
-        lineIndex = i + 1;
+      if (line.includes("Creating bill")) {
+        billData.billNo = line.replace("Creating bill", "").trim();
+        break;
+      } else if (line && /\/\d+$/.test(line)) {
+        billData.billNo = line;
         break;
       }
     }
     
-    // Process remaining lines
-    for (let i = lineIndex; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const actualLine = line.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
-      if (!actualLine) continue;
+    // Extract date - look for DD-MM-YYYY format
+    const dateIndex = cleanedLines.findIndex((line: string) => line.match(/^\d{2}-\d{2}-\d{4}$/));
+    if (dateIndex !== -1) {
+      const [day, month, year] = cleanedLines[dateIndex].split('-');
+      billData.date = new Date(`${year}-${month}-${day}`);
+    } else {
+      billData.date = new Date();
+    }
+    
+    // Extract customer name (usually after date)
+    const nameIndex = dateIndex !== -1 ? dateIndex + 1 : 0;
+    if (nameIndex < cleanedLines.length && !cleanedLines[nameIndex].startsWith("TIME:") && 
+        !cleanedLines[nameIndex].match(/^\d{10}$/)) {
+      billData.customerName = cleanedLines[nameIndex];
+    }
+    
+    // Extract customer phone (10 digit number)
+    const phoneIndex = cleanedLines.findIndex((line: string) => line.match(/^\d{10}$/));
+    if (phoneIndex !== -1) {
+      billData.customerPhone = cleanedLines[phoneIndex];
+    }
+    
+    // Extract payment type
+    const paymentIndex = cleanedLines.findIndex((line: string | string[]) => line.includes("BILL"));
+    if (paymentIndex !== -1) {
+      billData.paymentType = cleanedLines[paymentIndex].toLowerCase().includes("cash") ? "cash" : cleanedLines[paymentIndex];
+    }
+    
+    // Extract store name and location (after payment type)
+    if (paymentIndex !== -1 && paymentIndex + 1 < cleanedLines.length) {
+      billData.storeName = cleanedLines[paymentIndex + 1];
       
-      // Extract date
-      if (actualLine.match(/^\d{2}-\d{2}-\d{4}$/)) {
-        const [day, month, year] = actualLine.split('-');
-        billData.date = new Date(`${year}-${month}-${day}`);
-        continue;
-      }
-      
-      // Extract customer name (assuming it appears early in the log)
-      if (!billData.customerName && actualLine && !actualLine.includes("TIME:") && !actualLine.match(/^\d+$/)) {
-        billData.customerName = actualLine;
-        continue;
-      }
-      
-      // Extract customer phone (10 digit number)
-      if (actualLine.match(/^\d{10}$/) && !billData.customerPhone) {
-        billData.customerPhone = actualLine;
-        continue;
-      }
-      
-      // Extract payment type
-      if (actualLine.includes("BILL")) {
-        billData.paymentType = actualLine.toLowerCase().includes("cash") ? "cash" : actualLine;
-        continue;
-      }
-      
-      // Extract store name (assuming it comes after customer info)
-      if (!billData.storeName && billData.customerName && actualLine && !actualLine.match(/^\d+$/)) {
-        billData.storeName = actualLine;
-        continue;
-      }
-      
-      // Extract store location (assuming it comes after store name)
-      if (billData.storeName && !billData.storeLocation && actualLine && !actualLine.match(/^\d+$/)) {
-        billData.storeLocation = actualLine;
-        continue;
-      }
-      
-      // Extract store phone (assuming it's another 10-digit number after customer phone)
-      if (actualLine.match(/^\d{10}$/) && billData.customerPhone && !billData.storePhone && actualLine !== billData.customerPhone) {
-        billData.storePhone = actualLine;
-        continue;
-      }
-      
-      // Look for amounts at the end of the log
-      // Find lines with currency values
-      if (actualLine.match(/^Rs\.|^₹/) && actualLine.includes("Only")) {
-        billData.amountText = actualLine;
-        
-        // The next few lines should contain numerical values
-        let amountCount = 0;
-        for (let j = i + 1; j < i + 5 && j < lines.length; j++) {
-          const amountLine = lines[j].trim();
-          const actualAmountLine = amountLine.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
-          
-          if (actualAmountLine.match(/^\d+\.\d{2}$/)) {
-            const amount = parseFloat(actualAmountLine);
-            amountCount++;
-            
-            if (amountCount === 1) {
-              // First amount is netAmount (but we won't use it as per requirement)
-              billData.calculatedAmount = amount;
-            } else if (amountCount === 2) {
-              // Second amount is discount - put in both netDiscount and creditAmount
-              billData.netDiscount = amount;
-              billData.creditAmount = amount;
-            } else if (amountCount === 3) {
-              // Third amount is the amountPaid
-              billData.amountPaid = amount;
-              break;
-            }
-          }
-        }
-        
-        i += amountCount; // Skip the amount lines we've processed
-        continue;
-      }
-      
-      // Start capturing item details
-      if (actualLine.match(/^\d+$/) && !isItemSection && i > 10) {
-        isItemSection = true;
-        currentItem = {
-          quantity: parseInt(actualLine)
-        };
-        continue;
-      }
-      
-      if (isItemSection) {
-        if (!currentItem.item) {
-          currentItem.item = actualLine;
-          continue;
-        }
-        
-        if (!currentItem.batch && actualLine.match(/^\d+$/)) {
-          currentItem.batch = actualLine;
-          continue;
-        }
-        
-        if (currentItem.batch && !currentItem.expBatch && actualLine.match(/\d+\/\d+/)) {
-          currentItem.expBatch = actualLine;
-          continue;
-        }
-        
-        if (currentItem.expBatch && !currentItem.mrp && actualLine.match(/^\d+\.\d{2}$/)) {
-          currentItem.mrp = parseFloat(actualLine);
-          continue;
-        }
-        
-        if (currentItem.mrp && !currentItem.discount && actualLine.match(/^\d+\.\d{2}$|^\d+$/)) {
-          currentItem.discount = parseFloat(actualLine);
-          
-          // Add item to list and reset for next item
-          billData.items.push(currentItem);
-          currentItem = {};
-          
-          // Look for next item quantity
-          if (i + 1 < lines.length) {
-            const nextLine = lines[i + 1].trim();
-            const nextActualLine = nextLine.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
-            
-            if (nextActualLine.match(/^\d+$/)) {
-              currentItem = {
-                quantity: parseInt(nextActualLine)
-              };
-              i++;
-            } else if (nextActualLine.match(/^\d+:\d+$/)) {
-              // This might be a ratio indicator, not an item
-              isItemSection = false;
-            }
-          }
-          
-          continue;
-        }
+      if (paymentIndex + 2 < cleanedLines.length) {
+        billData.storeLocation = cleanedLines[paymentIndex + 2];
       }
     }
+    
+    // Extract store phone (typically after store location)
+    const storePhoneIndex = cleanedLines.findIndex((line: string, index: number) => 
+      line.match(/^\d{10}$/) && index > phoneIndex && line !== billData.customerPhone
+    );
+    if (storePhoneIndex !== -1) {
+      billData.storePhone = cleanedLines[storePhoneIndex];
+    }
+    
+    // Find amount text (contains "Rs." and "Only")
+    const amountTextIndex = cleanedLines.findIndex((line: string) => 
+      (line.startsWith("Rs.") || line.startsWith("₹")) && line.includes("Only")
+    );
+    
+    // Extract monetary values (they come after the amount text)
+    if (amountTextIndex !== -1) {
+      billData.amountText = cleanedLines[amountTextIndex];
+      
+      // The next few lines should contain the monetary values
+      const totalAmountIndex = amountTextIndex + 1;
+      const discountIndex = amountTextIndex + 2;
+      const finalAmountIndex = amountTextIndex + 3;
+      
+      if (totalAmountIndex < cleanedLines.length && 
+          cleanedLines[totalAmountIndex].match(/^\d+\.\d{2}$/)) {
+        billData.calculatedAmount = parseFloat(cleanedLines[totalAmountIndex]);
+      }
+      
+      if (discountIndex < cleanedLines.length && 
+          cleanedLines[discountIndex].match(/^\d+\.\d{2}$/)) {
+        billData.netDiscount = parseFloat(cleanedLines[discountIndex]);
+        billData.creditAmount = parseFloat(cleanedLines[discountIndex]);
+      }
+      
+      if (finalAmountIndex < cleanedLines.length && 
+          cleanedLines[finalAmountIndex].match(/^\d+\.\d{2}$/)) {
+        // Use calculatedAmount instead of finalAmount for amountPaid
+        billData.amountPaid = billData.calculatedAmount;
+      }
+    }
+    
+    // Extract items - more robust item detection
+    const medicineItems: any[] = [];
+    
+    // Find potential item starting points (quantities)
+    const itemStartIndices: number[] = [];
+    cleanedLines.forEach((line: string, index: number) => {
+      // Items typically start with a single digit quantity (1-9)
+      if ((line.match(/^[1-9]$/) || line.match(/^[1-9]:[0-9]$/)) && 
+      index < cleanedLines.length - 5) {
+        itemStartIndices.push(index);
+      }
+    });
+    
+    // Process each potential item
+    for (let i = 0; i < itemStartIndices.length; i++) {
+      const startIndex = itemStartIndices[i];
+      const endIndex = i < itemStartIndices.length - 1 
+        ? itemStartIndices[i + 1] 
+        : cleanedLines.length;
+      
+      // Get all lines that might be part of this item
+      const itemLines = cleanedLines.slice(startIndex, endIndex);
+      
+      // Basic validation - we need at least quantity, name, batch, expiry, MRP, discount
+      if (itemLines.length < 6) continue;
+      
+      // Parse quantity
+      const quantity = parseInt(itemLines[0]);
+      if (isNaN(quantity)) continue;
+      
+      // Item name is typically the line after quantity
+      const itemName = itemLines[1];
+      
+      // Find batch number (typically numeric)
+      const batchIndex = itemLines.findIndex((line: string, idx: number) => 
+        idx > 1 && line.match(/^\d+$/)
+      );
+      if (batchIndex === -1) continue;
+      
+      // Find expiry (typically in format MM/YY)
+      const expiryIndex = itemLines.findIndex((line: string, idx: number) => 
+        idx > batchIndex && line.match(/^\d{1,2}\/\d{2,4}$/)
+      );
+      if (expiryIndex === -1) continue;
+      
+      // Find MRP (decimal number)
+      const mrpIndex = itemLines.findIndex((line: string, idx: number) => 
+        idx > expiryIndex && line.match(/^\d+\.\d{2}$/)
+      );
+      if (mrpIndex === -1) continue;
+      
+      // Find discount (decimal or whole number)
+      const discountIndex = itemLines.findIndex((line: string, idx: number) => 
+        idx > mrpIndex && line.match(/^\d+(\.\d{2})?$/)
+      );
+      if (discountIndex === -1) continue;
+      
+      // Create item object
+      const item = {
+        quantity,
+        item: itemName,
+        batch: itemLines[batchIndex],
+        expBatch: itemLines[expiryIndex],
+        mrp: parseFloat(itemLines[mrpIndex]),
+        discount: parseFloat(itemLines[discountIndex])
+      };
+      
+      medicineItems.push(item);
+    }
+    
+    // Update items array if we found any valid items
+    if (medicineItems.length > 0) {
+      billData.items = medicineItems;
+    }
+    
+    // Debug log the extracted items
+    console.log("Extracted items:", billData.items);
     
     // Find or create customer
     let customer = await prisma.customer.findUnique({
@@ -188,7 +203,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
       customer = await prisma.customer.create({
         data: {
           name: billData.customerName || "Unknown Customer",
-          phone: billData.customerPhone || "0000000000", // Fallback for missing phone
+          phone: billData.customerPhone || `Unknown-${Date.now()}`,
           address: null,
         }
       });
@@ -202,14 +217,29 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
     if (!store) {
       store = await prisma.store.create({
         data: {
-          storeName: billData.storeName || "Unknown Store",
+          storeName: billData.storeName,
           address: billData.storeLocation || null,
           phone: billData.storePhone || null,
         }
       });
     }
     
-    // Create the bill
+    // Prepare bill details - verify item data format
+    const billDetails = billData.items.map((item: any) => {
+      return {
+        item: item.item || "Unknown Item",
+        quantity: item.quantity || 1,
+        batch: item.batch || "",
+        expBatch: item.expBatch || "",
+        mrp: item.mrp || 0,
+        discount: item.discount || 0,
+      };
+    });
+    
+    // Log billDetails being created
+    console.log("Creating bill details:", billDetails);
+    
+    // Create the bill with nested bill details
     const newBill = await prisma.bill.create({
       data: {
         billNo: billData.billNo || `UNKNOWN-${Date.now()}`,
@@ -218,20 +248,17 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
         date: billData.date || new Date(),
         netDiscount: billData.netDiscount || 0,
         netAmount: 0, // Not using this field as per requirement
-        amountPaid: billData.amountPaid || 0,
-        creditAmount: billData.creditAmount || 0,
+        amountPaid: billData.calculatedAmount || 0, // Use calculated amount (162.20)
+        creditAmount: billData.netDiscount || 0, // Use netDiscount (32.44)
         paymentType: billData.paymentType || "cash",
         isUploaded: true,
         billDetails: {
-          create: billData.items.map((item: any) => ({
-            item: item.item || "Unknown Item",
-            quantity: item.quantity || 1,
-            batch: item.batch || "",
-            expBatch: item.expBatch || "",
-            mrp: item.mrp || 0,
-            discount: item.discount || 0,
-          }))
+          create: billDetails
         }
+      },
+      // Include the created bill details in the response
+      include: {
+        billDetails: true
       }
     });
     
@@ -239,7 +266,8 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
       success: true, 
       message: `Bill ${billData.billNo} created successfully`,
       billId: newBill.id,
-      parsedData: billData // Include for debugging/verification
+      parsedData: billData, // Include for debugging/verification
+      billWithDetails: newBill // Include the full bill with details
     });
   } catch (error) {
     console.error("Error creating bill:", error);

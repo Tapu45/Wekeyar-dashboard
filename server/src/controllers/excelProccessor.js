@@ -54,11 +54,16 @@ const DEFAULT_NAME = "Cashlist Customer";
     // Download file using streaming to reduce memory usage
   
     
-    const response = await axios({
-      method: 'get',
-      url: fileUrl,
-      responseType: 'stream'
-    });
+ // Download file using streaming with retry logic
+ const response = await executeWithRetry(async () => {
+  return axios({
+    method: 'get',
+    url: fileUrl,
+    responseType: 'stream',
+  });
+});
+
+console.log('File downloaded successfully.');
     
   
     

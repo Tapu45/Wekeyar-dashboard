@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   ChevronDown, 
   ChevronUp, 
-  Search, 
   Calendar, 
   User, 
   Phone, 
@@ -18,10 +17,18 @@ import {
   Pill, 
   Package
 } from "lucide-react";
+import {  exportDetailedToExcel, exportDetailedToPDF, exportNormalToExcel, exportNormalToPDF } from "../utils/Exportutils";
 
-const fetchCustomerReport = async (startDate: string, endDate: string, search: string) => {
+const fetchCustomerReport = async (startDate: string, endDate: string, search: string, storeId: number| null) => {
+  const isBillNo = search.startsWith("CS/"); // Check if the input is a bill number
   const { data } = await api.get(API_ROUTES.CUSTOMER_REPORT, {
-    params: { startDate, endDate, search },
+    params: { 
+      startDate, 
+      endDate, 
+      search: isBillNo ? undefined : search, 
+      billNo: isBillNo ? search : undefined,
+      storeId: storeId || undefined, // Include storeId if it's not null 
+    },
   });
   return data;
 };
@@ -35,18 +42,34 @@ const CustomerReportPage = () => {
   const [expandedBill, setExpandedBill] = useState(null);
   const [sortField, setSortField] = useState("customerName");
   const [sortDirection, setSortDirection] = useState("asc");
+  const [selectedStore, setSelectedStore] = useState<number | null>(null);
+  const [stores, setStores] = useState<{ id: number; storeName: string }[]>([]);
+  
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["customerReport", startDate, endDate, search],
-    queryFn: () => fetchCustomerReport(startDate, endDate, search),
+    queryKey: ["customerReport", startDate, endDate, search, selectedStore],
+    queryFn: () => fetchCustomerReport(startDate, endDate, search, selectedStore),
     enabled: false,
   });
 
   useEffect(() => {
-    if (startDate && endDate) {
+    const fetchStores = async () => {
+      try {
+        const { data } = await api.get(API_ROUTES.STORES);
+        setStores(data);
+      } catch (error) {
+        console.error("Failed to fetch stores:", error);
+      }
+    };
+  
+    fetchStores();
+  }, []);
+
+  useEffect(() => {
+    if (startDate && endDate && selectedStore !== null) {
       refetch();
     }
-  }, [startDate, endDate, search, refetch]);
+  }, [startDate, endDate, search, selectedStore, refetch]);
 
   const toggleCustomerExpand = (customerIndex: number) => {
     setExpandedCustomer((prev) => (prev === customerIndex ? null : customerIndex));
@@ -69,6 +92,27 @@ const CustomerReportPage = () => {
     } else {
       setSortField(field);
       setSortDirection("asc");
+    }
+  };
+
+  const handleExport = (type: "normal" | "detailed") => {
+    const input = window.prompt("Enter export format: 'excel' or 'pdf'");
+    const format = input ? input.toLowerCase() : "";
+  
+    if (format === "excel") {
+      if (type === "normal") {
+        exportNormalToExcel(data);
+      } else {
+        exportDetailedToExcel(data);
+      }
+    } else if (format === "pdf") {
+      if (type === "normal") {
+        exportNormalToPDF(data);
+      } else {
+        exportDetailedToPDF(data);
+      }
+    } else {
+      alert("Invalid format. Please enter 'excel' or 'pdf'.");
     }
   };
 
@@ -133,43 +177,78 @@ const CustomerReportPage = () => {
       {/* Filters and Data Table */}
       <div className="p-6">
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Calendar className="h-5 w-5 text-blue-500" />
-            </div>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              placeholder="Start Date"
-              className="pl-10 pr-4 py-3 w-full rounded-lg border border-blue-200 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition duration-150"
-            />
-          </div>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Calendar className="h-5 w-5 text-blue-500" />
-            </div>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              placeholder="End Date"
-              className="pl-10 pr-4 py-3 w-full rounded-lg border border-blue-200 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition duration-150"
-            />
-          </div>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-blue-500" />
-            </div>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by Name or Mobile"
-              className="pl-10 pr-4 py-3 w-full rounded-lg border border-blue-200 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition duration-150"
-            />
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+  {/* Store Selection */}
+  <div className="relative">
+    <label className="block text-sm font-medium text-blue-700 mb-1">Select Store</label>
+    <select
+      className="block w-full border border-blue-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
+      value={selectedStore || ""}
+      onChange={(e) => setSelectedStore(Number(e.target.value))}
+    >
+      <option value="" disabled>
+        -- Select a Store --
+      </option>
+      {stores.map((store) => (
+        <option key={store.id} value={store.id}>
+          {store.storeName}
+        </option>
+      ))}
+    </select>
+  </div>
+
+  {/* Start Date */}
+  <div className="relative">
+    <label className="block text-sm font-medium text-blue-700 mb-1">Start Date</label>
+    <input
+      type="date"
+      value={startDate}
+      onChange={(e) => setStartDate(e.target.value)}
+      className="block w-full border border-blue-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
+      disabled={!selectedStore} // Disable if no store is selected
+    />
+  </div>
+
+  {/* End Date */}
+  <div className="relative">
+    <label className="block text-sm font-medium text-blue-700 mb-1">End Date</label>
+    <input
+      type="date"
+      value={endDate}
+      onChange={(e) => setEndDate(e.target.value)}
+      className="block w-full border border-blue-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
+      disabled={!selectedStore} // Disable if no store is selected
+    />
+  </div>
+
+  {/* Search */}
+  <div className="relative">
+    <label className="block text-sm font-medium text-blue-700 mb-1">Search</label>
+    <input
+      type="text"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      placeholder="Search by Name, Mobile, or Bill No"
+      className="block w-full border border-blue-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
+      disabled={!selectedStore} // Disable if no store is selected
+    />
+  </div>
+</div>
+
+{/* Export Buttons */}
+<div className="flex justify-end space-x-4 mb-4">
+          <button
+            onClick={() => handleExport(data)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-blue-700 transition"
+          >
+            Export Normal
+          </button>
+          <button
+            onClick={() => handleExport(data)}
+            className="bg-green-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-green-700 transition"
+          >
+            Export Detailed
+          </button>
         </div>
   
         {/* Data Table */}

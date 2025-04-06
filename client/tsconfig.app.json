@@ -20,7 +20,11 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+
+    
+    /* Add this to include custom types */
+    "typeRoots": ["./node_modules/@types", "./src/utils"]
   },
   "include": ["src"]
 }

@@ -39,18 +39,18 @@ const Sidebar = ({
 
   // Define the links with role-based access
   const links: SidebarLink[] = [
-    { title: "Summary Report", path: "/", icon: LayoutDashboard, roles: ["admin"] },
+    { title: "Summary Report", path: "/", icon: LayoutDashboard, roles: ["admin", "tellecaller"] },
     {
       title: "Non-Buying Customers",
       path: "/non-buying-customers",
       icon: User,
-      roles: ["admin"],
+      roles: ["admin", "tellecaller"],
     },
     {
       title: "Monthly Non-Buying",
       path: "/non-buying-monthly-customers",
       icon: ClipboardList,
-      roles: ["admin"],
+      roles: ["admin", "tellecaller"],
     },
     {
       title: "Order History",
@@ -58,8 +58,8 @@ const Sidebar = ({
       icon: ClipboardList,
       roles: ["tellecaller"],
     },
-    { title: "Customer Report", path: "/customer-report", icon: BarChart3, roles: ["admin"] },
-    { title: "Store Sales Report", path: "/store-sales-report", icon: Store, roles: ["admin"] },
+    { title: "Customer Report", path: "/customer-report", icon: BarChart3, roles: ["admin", "tellecaller"] },
+    { title: "Store Sales Report", path: "/store-sales-report", icon: Store, roles: ["admin", "tellecaller"] },
     { title: "Upload", path: "/upload", icon: UploadCloud, roles: ["admin"] },
     {
       title: "Upload Status",

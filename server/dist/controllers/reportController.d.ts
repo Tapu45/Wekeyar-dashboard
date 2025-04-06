@@ -11,3 +11,4 @@ export declare const getInactiveCustomers: (req: Request, res: Response) => Prom
 export declare const getCustomerPurchaseHistory: (req: Request, res: Response) => Promise<void>;
 export declare const getBillDetailsByBillNo: (req: Request, res: Response) => Promise<void>;
 export declare const getUploadStatusByMonth: (req: Request, res: Response) => Promise<void>;
+export declare const getStores: (_req: Request, res: Response) => Promise<void>;

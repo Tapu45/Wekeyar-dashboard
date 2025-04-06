@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUploadStatusByMonth = exports.getBillDetailsByBillNo = exports.getCustomerPurchaseHistory = exports.getInactiveCustomers = exports.getAllCustomers = exports.getStoreWiseSalesReport = exports.getCustomerReport = exports.getNonBuyingMonthlyCustomers = exports.getNonBuyingCustomers = exports.getSummary = exports.prisma = void 0;
+exports.getStores = exports.getUploadStatusByMonth = exports.getBillDetailsByBillNo = exports.getCustomerPurchaseHistory = exports.getInactiveCustomers = exports.getAllCustomers = exports.getStoreWiseSalesReport = exports.getCustomerReport = exports.getNonBuyingMonthlyCustomers = exports.getNonBuyingCustomers = exports.getSummary = exports.prisma = void 0;
 const client_1 = require("@prisma/client");
 const date_fns_1 = require("date-fns");
 exports.prisma = new client_1.PrismaClient();
@@ -12,7 +12,9 @@ const getSummary = async (req, res) => {
         const previousMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
         const startDate = fromDate ? new Date(fromDate) : previousMonthStart;
         const endDate = toDate ? new Date(toDate) : previousMonthEnd;
-        const totalCustomers = await exports.prisma.customer.count();
+        const totalCustomers = await exports.prisma.customer.count({
+            where: storeId ? { bills: { some: { storeId: Number(storeId) } } } : undefined,
+        });
         const inactiveCustomers = await exports.prisma.customer.findMany({
             where: {
                 bills: {
@@ -21,6 +23,7 @@ const getSummary = async (req, res) => {
                             gte: startDate,
                             lte: endDate,
                         },
+                        ...(storeId ? { storeId: Number(storeId) } : {}),
                     },
                 },
             },
@@ -41,8 +44,7 @@ const getSummary = async (req, res) => {
         });
         const inactiveCustomerCount = filteredInactiveCustomers.length;
         const activeCustomerCount = totalCustomers - inactiveCustomerCount;
-        const totalRevenueData = await exports.prisma.bill.aggregate({
-            _sum: { netAmount: true },
+        const totalBills = await exports.prisma.bill.count({
             where: {
                 date: {
                     gte: startDate,
@@ -51,15 +53,26 @@ const getSummary = async (req, res) => {
                 ...(storeId ? { storeId: Number(storeId) } : {}),
             },
         });
-        const avgMonthlyRevenue = totalRevenueData._sum.netAmount
-            ? totalRevenueData._sum.netAmount / 12
-            : 0;
+        const bills = await exports.prisma.bill.findMany({
+            where: {
+                date: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+                ...(storeId ? { storeId: Number(storeId) } : {}),
+            },
+            select: {
+                amountPaid: true,
+                creditAmount: true,
+            },
+        });
+        const totalAmount = bills.reduce((sum, bill) => sum + (bill.amountPaid - bill.creditAmount), 0);
         const summary = {
             totalCustomers,
             activeCustomers: activeCustomerCount,
             inactiveCustomers: inactiveCustomerCount,
-            totalRevenue: totalRevenueData._sum.netAmount || 0,
-            avgMonthlyRevenue,
+            totalBills,
+            totalAmount,
         };
         res.json(summary);
     }
@@ -602,4 +615,21 @@ const getUploadStatusByMonth = async (req, res) => {
     }
 };
 exports.getUploadStatusByMonth = getUploadStatusByMonth;
+const getStores = async (_req, res) => {
+    try {
+        const stores = await exports.prisma.store.findMany({
+            select: {
+                id: true,
+                storeName: true,
+                address: true,
+            },
+        });
+        res.status(200).json(stores);
+    }
+    catch (error) {
+        console.error("Error fetching stores:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+};
+exports.getStores = getStores;
 //# sourceMappingURL=reportController.js.map

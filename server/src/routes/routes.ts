@@ -11,6 +11,7 @@ import {
   getInactiveCustomers,
   getBillDetailsByBillNo,
   getUploadStatusByMonth,
+  getStores,
 } from "../controllers/reportController";
 import { getCustomerPurchaseHistory } from "../controllers/reportController";
 
@@ -23,6 +24,7 @@ router.get("/customers", getAllCustomers);
 router.get("/inactive-customers", getInactiveCustomers);
 router.get("/bills/:billNo", getBillDetailsByBillNo);
 router.get("/upload-status", getUploadStatusByMonth);
+router.get("/stores", getStores);
 
 
 router.get("/customer/:customerId/purchase-history", getCustomerPurchaseHistory);

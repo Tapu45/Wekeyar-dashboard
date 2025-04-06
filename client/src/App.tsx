@@ -54,7 +54,7 @@ const App: React.FC = () => {
             <Route
               path="summary-report"
               element={
-                <ProtectedRoute allowedRoles={["admin"]}>
+                <ProtectedRoute allowedRoles={["admin", "tellecaller"]}>
                   <SummaryReport />
                 </ProtectedRoute>
               }
@@ -62,7 +62,7 @@ const App: React.FC = () => {
             <Route
               path="non-buying-customers"
               element={
-                <ProtectedRoute allowedRoles={["admin"]}>
+                <ProtectedRoute allowedRoles={["admin", "tellecaller"]}>
                   <NonBuyingCustomerReport />
                 </ProtectedRoute>
               }
@@ -70,7 +70,7 @@ const App: React.FC = () => {
             <Route
               path="non-buying-monthly-customers"
               element={
-                <ProtectedRoute allowedRoles={["admin"]}>
+                <ProtectedRoute allowedRoles={["admin", "tellecaller"]}>
                   <NonBuyingMonthlyCustomer />
                 </ProtectedRoute>
               }
@@ -78,7 +78,7 @@ const App: React.FC = () => {
             <Route
               path="customer-report"
               element={
-                <ProtectedRoute allowedRoles={["admin"]}>
+                <ProtectedRoute allowedRoles={["admin", "tellecaller"]}>
                   <CustomerReportPage />
                 </ProtectedRoute>
               }
@@ -86,7 +86,7 @@ const App: React.FC = () => {
             <Route
               path="store-sales-report"
               element={
-                <ProtectedRoute allowedRoles={["admin"]}>
+                <ProtectedRoute allowedRoles={["admin", "tellecaller"]}>
                   <StoreWiseSalesReportPage />
                 </ProtectedRoute>
               }
@@ -102,7 +102,7 @@ const App: React.FC = () => {
             <Route
               path="telecaller-remarks-orders"
               element={
-                <ProtectedRoute allowedRoles={["tellecaller"]}>
+                <ProtectedRoute allowedRoles={["tellecaller", "admin"]}>
                   <TelecallerRemarksOrders />
                 </ProtectedRoute>
               }
@@ -171,10 +171,8 @@ const RoleBasedRedirect: React.FC = () => {
 
   try {
     const decoded: { role: string } = JSON.parse(atob(token.split(".")[1]));
-    if (decoded.role === "admin") {
-      return <Navigate to="/summary-report" replace />;
-    } else if (decoded.role === "tellecaller") {
-      return <Navigate to="/tellecalling" replace />;
+    if (decoded.role === "admin" || decoded.role === "tellecaller") {
+      return <Navigate to="/summary-report" replace />; // Redirect all roles to SummaryReport
     }
   } catch (error) {
     console.error("Failed to decode token:", error);

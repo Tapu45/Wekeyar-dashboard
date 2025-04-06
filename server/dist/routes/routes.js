@@ -13,6 +13,7 @@ router.get("/customers", reportController_1.getAllCustomers);
 router.get("/inactive-customers", reportController_1.getInactiveCustomers);
 router.get("/bills/:billNo", reportController_1.getBillDetailsByBillNo);
 router.get("/upload-status", reportController_1.getUploadStatusByMonth);
+router.get("/stores", reportController_1.getStores);
 router.get("/customer/:customerId/purchase-history", reportController_2.getCustomerPurchaseHistory);
 exports.default = router;
 //# sourceMappingURL=routes.js.map

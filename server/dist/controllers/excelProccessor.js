@@ -43,11 +43,14 @@ async function processExcelFile() {
     try {
         const { fileUrl } = workerData;
         console.log(`Downloading file from Cloudinary: ${fileUrl}`);
-        const response = await axios({
-            method: 'get',
-            url: fileUrl,
-            responseType: 'stream'
+        const response = await executeWithRetry(async () => {
+            return axios({
+                method: 'get',
+                url: fileUrl,
+                responseType: 'stream',
+            });
         });
+        console.log('File downloaded successfully.');
         const startTime = Date.now();
         const storeMap = new Map();
         const customerMap = new Map();

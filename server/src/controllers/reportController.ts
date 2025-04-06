@@ -20,10 +20,12 @@ export const getSummary = async (req: Request, res: Response) => {
     const startDate = fromDate ? new Date(fromDate as string) : previousMonthStart;
     const endDate = toDate ? new Date(toDate as string) : previousMonthEnd;
 
-    // Total customers count
-    const totalCustomers = await prisma.customer.count();
+    // Total customers count (filter by storeId if provided)
+    const totalCustomers = await prisma.customer.count({
+      where: storeId ? { bills: { some: { storeId: Number(storeId) } } } : undefined,
+    });
 
-    // Fetch inactive customers (customers with no bills in the specified date range)
+    // Fetch inactive customers (filter by storeId if provided)
     const inactiveCustomers = await prisma.customer.findMany({
       where: {
         bills: {
@@ -32,6 +34,7 @@ export const getSummary = async (req: Request, res: Response) => {
               gte: startDate,
               lte: endDate,
             },
+            ...(storeId ? { storeId: Number(storeId) } : {}),
           },
         },
       },
@@ -59,10 +62,7 @@ export const getSummary = async (req: Request, res: Response) => {
 
     // Calculate active customers by subtracting inactive customers from total customers
     const activeCustomerCount = totalCustomers - inactiveCustomerCount;
-
-    // Total revenue
-    const totalRevenueData = await prisma.bill.aggregate({
-      _sum: { netAmount: true },
+    const totalBills = await prisma.bill.count({
       where: {
         date: {
           gte: startDate,
@@ -71,19 +71,33 @@ export const getSummary = async (req: Request, res: Response) => {
         ...(storeId ? { storeId: Number(storeId) } : {}),
       },
     });
+    
+    const bills = await prisma.bill.findMany({
+      where: {
+        date: {
+          gte: startDate,
+          lte: endDate,
+        },
+        ...(storeId ? { storeId: Number(storeId) } : {}),
+      },
+      select: {
+        amountPaid: true,
+        creditAmount: true,
+      },
+    });
 
-    // Calculate average monthly revenue
-    const avgMonthlyRevenue = totalRevenueData._sum.netAmount
-      ? totalRevenueData._sum.netAmount / 12
-      : 0;
+    const totalAmount = bills.reduce(
+      (sum, bill) => sum + (bill.amountPaid - bill.creditAmount),
+      0
+    );
 
     // Prepare the summary response
     const summary = {
       totalCustomers,
       activeCustomers: activeCustomerCount,
       inactiveCustomers: inactiveCustomerCount,
-      totalRevenue: totalRevenueData._sum.netAmount || 0,
-      avgMonthlyRevenue,
+      totalBills,
+      totalAmount,
     };
 
     res.json(summary);
@@ -798,6 +812,27 @@ export const getUploadStatusByMonth = async (req: Request, res: Response): Promi
     res.status(200).json(result);
   } catch (error) {
     console.error("Error fetching upload status:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
+ * Fetch Stores
+ */
+export const getStores = async (_req: Request, res: Response) => {
+  try {
+    // Fetch all stores from the database
+    const stores = await prisma.store.findMany({
+      select: {
+        id: true,
+        storeName: true,
+        address: true, // Optional: Include address if needed
+      },
+    });
+
+    res.status(200).json(stores);
+  } catch (error) {
+    console.error("Error fetching stores:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };

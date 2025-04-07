@@ -11,7 +11,7 @@ async function postDailyBills(req, res) {
             res.status(400).json({ error: "Invalid request body" });
             return;
         }
-        console.log("Processing bill", bill);
+        console.log("Creating bill", bill);
         const lines = bill.split('\n');
         const billData = {
             items: []
@@ -22,134 +22,110 @@ async function postDailyBills(req, res) {
         for (let i = 0; i < cleanedLines.length; i++) {
             const line = cleanedLines[i];
             if (line.includes("Creating bill")) {
-                billData.billType = line.replace("Creating bill", "").trim();
+                billData.billNo = line.replace("Creating bill", "").trim();
+                break;
             }
-            else if (line.startsWith("Invoice No.") && i + 1 < cleanedLines.length) {
-                if (cleanedLines[i + 1] === ":" && i + 2 < cleanedLines.length) {
-                    billData.billNo = cleanedLines[i + 2];
-                    i += 2;
-                }
-            }
-            else if (line.match(/^BILL[A-Z0-9]+/) || line.match(/^[A-Z]+\d+/)) {
-                billData.billNo = line.split("Date:")[0].trim();
-                if (line.includes("Date:")) {
-                    const dateStr = line.split("Date:")[1].trim();
-                    if (dateStr.match(/^\d{2}-\d{2}-\d{4}$/)) {
-                        const [day, month, year] = dateStr.split('-');
-                        billData.date = new Date(`${year}-${month}-${day}`);
-                    }
-                }
+            else if (line && /\/\d+$/.test(line)) {
+                billData.billNo = line;
+                break;
             }
         }
-        const storeNameIndex = cleanedLines.findIndex((line) => !line.includes("Creating bill") && line.match(/^[A-Z\s]+$/) && line.length > 5);
-        if (storeNameIndex !== -1) {
-            billData.storeName = cleanedLines[storeNameIndex];
-            for (let i = storeNameIndex + 1; i < storeNameIndex + 4 && i < cleanedLines.length; i++) {
-                if (cleanedLines[i] && !cleanedLines[i].startsWith("Phone :") && !cleanedLines[i].startsWith("Website :")) {
-                    billData.storeLocation = (billData.storeLocation || "") +
-                        (billData.storeLocation ? " " : "") + cleanedLines[i];
-                }
-            }
-        }
-        const phoneLineIndex = cleanedLines.findIndex((line) => line.startsWith("Phone :"));
-        if (phoneLineIndex !== -1) {
-            const phoneMatch = cleanedLines[phoneLineIndex].match(/\d{10}/);
-            if (phoneMatch) {
-                billData.storePhone = phoneMatch[0];
-            }
-        }
-        const patientNameIndex = cleanedLines.findIndex((line) => line.startsWith("Patient Name :"));
-        if (patientNameIndex !== -1 && patientNameIndex + 1 < cleanedLines.length) {
-            const nameParts = cleanedLines[patientNameIndex].split(":");
-            if (nameParts.length > 1 && nameParts[1].trim()) {
-                billData.customerName = nameParts[1].trim();
-            }
-            else if (!cleanedLines[patientNameIndex + 1].includes(":")) {
-                billData.customerName = cleanedLines[patientNameIndex + 1];
-            }
-        }
-        billData.customerPhone = "9999999999";
-        const tableHeaderIndex = cleanedLines.findIndex((line) => line.includes("PRODUCT NAME") && line.includes("BATCH") && line.includes("MRP"));
-        if (tableHeaderIndex !== -1) {
-            let i = tableHeaderIndex + 1;
-            while (i < cleanedLines.length) {
-                if (cleanedLines[i].match(/^\d+\./)) {
-                    const productName = i + 1 < cleanedLines.length ? cleanedLines[i + 1] : "";
-                    let j = i + 2;
-                    let packSize = "";
-                    let batch = "";
-                    let expiry = "";
-                    let quantity = 0;
-                    let mrp = 0;
-                    let amount = 0;
-                    while (j < cleanedLines.length && !cleanedLines[j].match(/^\d+\./) && !cleanedLines[j].includes("SUB TOTAL")) {
-                        const line = cleanedLines[j];
-                        if (line.match(/^\d+$/)) {
-                            if (!packSize) {
-                                packSize = line;
-                            }
-                            else if (!quantity) {
-                                quantity = parseInt(line);
-                            }
-                            else if (!batch) {
-                                batch = line;
-                            }
-                        }
-                        else if (line.match(/^\d+\.\d{2}$/)) {
-                            if (!mrp) {
-                                mrp = parseFloat(line);
-                            }
-                            else if (!amount && parseFloat(line) > 100) {
-                                amount = parseFloat(line);
-                            }
-                        }
-                        j++;
-                    }
-                    if (amount > 0 && !quantity) {
-                        quantity = 1;
-                    }
-                    if (productName && amount > 0) {
-                        billData.items.push({
-                            item: productName,
-                            quantity: quantity || 1,
-                            batch: batch || "",
-                            expBatch: expiry || "",
-                            mrp: mrp || amount,
-                            discount: 0
-                        });
-                    }
-                    if (j < cleanedLines.length && cleanedLines[j].includes("SUB TOTAL")) {
-                        break;
-                    }
-                    i = j;
-                }
-                else {
-                    i++;
-                }
-            }
-        }
-        const grandTotalIndex = cleanedLines.findIndex((line) => line === "GRAND TOTAL");
-        if (grandTotalIndex !== -1 && grandTotalIndex + 1 < cleanedLines.length) {
-            const totalLine = cleanedLines[grandTotalIndex + 1];
-            if (totalLine.match(/^\d+\.\d{2}$/)) {
-                billData.calculatedAmount = parseFloat(totalLine);
-            }
+        const dateIndex = cleanedLines.findIndex((line) => line.match(/^\d{2}-\d{2}-\d{4}$/));
+        if (dateIndex !== -1) {
+            const [day, month, year] = cleanedLines[dateIndex].split('-');
+            billData.date = new Date(`${year}-${month}-${day}`);
         }
         else {
-            const subTotalIndex = cleanedLines.findIndex((line) => line === "SUB TOTAL");
-            if (subTotalIndex !== -1 && subTotalIndex + 1 < cleanedLines.length) {
-                const totalLine = cleanedLines[subTotalIndex + 1];
-                if (totalLine.match(/^\d+\.\d{2}$/)) {
-                    billData.calculatedAmount = parseFloat(totalLine);
-                }
+            billData.date = new Date();
+        }
+        const nameIndex = dateIndex !== -1 ? dateIndex + 1 : 0;
+        if (nameIndex < cleanedLines.length && !cleanedLines[nameIndex].startsWith("TIME:") &&
+            !cleanedLines[nameIndex].match(/^\d{10}$/)) {
+            billData.customerName = cleanedLines[nameIndex];
+        }
+        const phoneIndex = cleanedLines.findIndex((line) => line.match(/^\d{10}$/));
+        if (phoneIndex !== -1) {
+            billData.customerPhone = cleanedLines[phoneIndex];
+        }
+        const paymentIndex = cleanedLines.findIndex((line) => line.includes("BILL"));
+        if (paymentIndex !== -1) {
+            billData.paymentType = cleanedLines[paymentIndex].toLowerCase().includes("cash") ? "cash" : cleanedLines[paymentIndex];
+        }
+        if (paymentIndex !== -1 && paymentIndex + 1 < cleanedLines.length) {
+            billData.storeName = cleanedLines[paymentIndex + 1];
+            if (paymentIndex + 2 < cleanedLines.length) {
+                billData.storeLocation = cleanedLines[paymentIndex + 2];
             }
         }
-        const amountTextIndex = cleanedLines.findIndex((line) => line.startsWith("Rs."));
+        const storePhoneIndex = cleanedLines.findIndex((line, index) => line.match(/^\d{10}$/) && index > phoneIndex && line !== billData.customerPhone);
+        if (storePhoneIndex !== -1) {
+            billData.storePhone = cleanedLines[storePhoneIndex];
+        }
+        const amountTextIndex = cleanedLines.findIndex((line) => (line.startsWith("Rs.") || line.startsWith("₹")) && line.includes("Only"));
         if (amountTextIndex !== -1) {
             billData.amountText = cleanedLines[amountTextIndex];
+            const totalAmountIndex = amountTextIndex + 1;
+            const discountIndex = amountTextIndex + 2;
+            const finalAmountIndex = amountTextIndex + 3;
+            if (totalAmountIndex < cleanedLines.length &&
+                cleanedLines[totalAmountIndex].match(/^\d+\.\d{2}$/)) {
+                billData.calculatedAmount = parseFloat(cleanedLines[totalAmountIndex]);
+            }
+            if (discountIndex < cleanedLines.length &&
+                cleanedLines[discountIndex].match(/^\d+\.\d{2}$/)) {
+                billData.netDiscount = parseFloat(cleanedLines[discountIndex]);
+                billData.creditAmount = parseFloat(cleanedLines[discountIndex]);
+            }
+            if (finalAmountIndex < cleanedLines.length &&
+                cleanedLines[finalAmountIndex].match(/^\d+\.\d{2}$/)) {
+                billData.amountPaid = billData.calculatedAmount;
+            }
         }
-        billData.paymentType = "cash";
-        console.log("Extracted data:", billData);
+        const medicineItems = [];
+        const itemStartIndices = [];
+        cleanedLines.forEach((line, index) => {
+            if ((line.match(/^[1-9]$/) || line.match(/^[1-9]:[0-9]$/)) &&
+                index < cleanedLines.length - 5) {
+                itemStartIndices.push(index);
+            }
+        });
+        for (let i = 0; i < itemStartIndices.length; i++) {
+            const startIndex = itemStartIndices[i];
+            const endIndex = i < itemStartIndices.length - 1
+                ? itemStartIndices[i + 1]
+                : cleanedLines.length;
+            const itemLines = cleanedLines.slice(startIndex, endIndex);
+            if (itemLines.length < 6)
+                continue;
+            const quantity = parseInt(itemLines[0]);
+            if (isNaN(quantity))
+                continue;
+            const itemName = itemLines[1];
+            const batchIndex = itemLines.findIndex((line, idx) => idx > 1 && line.match(/^\d+$/));
+            if (batchIndex === -1)
+                continue;
+            const expiryIndex = itemLines.findIndex((line, idx) => idx > batchIndex && line.match(/^\d{1,2}\/\d{2,4}$/));
+            if (expiryIndex === -1)
+                continue;
+            const mrpIndex = itemLines.findIndex((line, idx) => idx > expiryIndex && line.match(/^\d+\.\d{2}$/));
+            if (mrpIndex === -1)
+                continue;
+            const discountIndex = itemLines.findIndex((line, idx) => idx > mrpIndex && line.match(/^\d+(\.\d{2})?$/));
+            if (discountIndex === -1)
+                continue;
+            const item = {
+                quantity,
+                item: itemName,
+                batch: itemLines[batchIndex],
+                expBatch: itemLines[expiryIndex],
+                mrp: parseFloat(itemLines[mrpIndex]),
+                discount: parseFloat(itemLines[discountIndex])
+            };
+            medicineItems.push(item);
+        }
+        if (medicineItems.length > 0) {
+            billData.items = medicineItems;
+        }
         console.log("Extracted items:", billData.items);
         let customer = await prisma.customer.findUnique({
             where: { phone: billData.customerPhone }
@@ -158,7 +134,7 @@ async function postDailyBills(req, res) {
             customer = await prisma.customer.create({
                 data: {
                     name: billData.customerName || "Unknown Customer",
-                    phone: billData.customerPhone,
+                    phone: billData.customerPhone || `Unknown-${Date.now()}`,
                     address: null,
                 }
             });
@@ -169,7 +145,7 @@ async function postDailyBills(req, res) {
         if (!store) {
             store = await prisma.store.create({
                 data: {
-                    storeName: billData.storeName || "Unknown Store",
+                    storeName: billData.storeName,
                     address: billData.storeLocation || null,
                     phone: billData.storePhone || null,
                 }
@@ -192,10 +168,10 @@ async function postDailyBills(req, res) {
                 customerId: customer.id,
                 storeId: store.id,
                 date: billData.date || new Date(),
-                netDiscount: 0,
+                netDiscount: billData.netDiscount || 0,
                 netAmount: 0,
                 amountPaid: billData.calculatedAmount || 0,
-                creditAmount: 0,
+                creditAmount: billData.netDiscount || 0,
                 paymentType: billData.paymentType || "cash",
                 isUploaded: true,
                 billDetails: {

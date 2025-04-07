@@ -13,7 +13,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
       return;
     }
 
-    console.log("Processing bill", bill);
+    console.log("Creating bill", bill);
     
     // Parse the log data
     const lines = bill.split('\n');
@@ -26,191 +26,175 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
       return line.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
     }).filter((line: string) => line !== '');
 
-    // Extract bill number and type
+    // Extract bill number
     for (let i = 0; i < cleanedLines.length; i++) {
       const line = cleanedLines[i];
       
       if (line.includes("Creating bill")) {
-        billData.billType = line.replace("Creating bill", "").trim();
-      } else if (line.startsWith("Invoice No.") && i + 1 < cleanedLines.length) {
-        // If line is "Invoice No." and next line is a colon, check the line after
-        if (cleanedLines[i + 1] === ":" && i + 2 < cleanedLines.length) {
-          billData.billNo = cleanedLines[i + 2];
-          i += 2; // Skip the next two lines
-        }
-      } else if (line.match(/^BILL[A-Z0-9]+/) || line.match(/^[A-Z]+\d+/)) {
-        // Look for patterns like BILLA0000
-        billData.billNo = line.split("Date:")[0].trim();
-        
-        // Extract date if it's on the same line
-        if (line.includes("Date:")) {
-          const dateStr = line.split("Date:")[1].trim();
-          if (dateStr.match(/^\d{2}-\d{2}-\d{4}$/)) {
-            const [day, month, year] = dateStr.split('-');
-            billData.date = new Date(`${year}-${month}-${day}`);
-          }
-        }
+        billData.billNo = line.replace("Creating bill", "").trim();
+        break;
+      } else if (line && /\/\d+$/.test(line)) {
+        billData.billNo = line;
+        break;
       }
     }
     
-    // Extract store name and location
-    const storeNameIndex = cleanedLines.findIndex((line: string) => 
-      !line.includes("Creating bill") && line.match(/^[A-Z\s]+$/) && line.length > 5
-    );
-    
-    if (storeNameIndex !== -1) {
-      billData.storeName = cleanedLines[storeNameIndex];
-      
-      // Store location is typically in the next few lines
-      for (let i = storeNameIndex + 1; i < storeNameIndex + 4 && i < cleanedLines.length; i++) {
-        if (cleanedLines[i] && !cleanedLines[i].startsWith("Phone :") && !cleanedLines[i].startsWith("Website :")) {
-          billData.storeLocation = (billData.storeLocation || "") + 
-            (billData.storeLocation ? " " : "") + cleanedLines[i];
-        }
-      }
-    }
-    
-    // Extract store phone
-    const phoneLineIndex = cleanedLines.findIndex((line: string) => line.startsWith("Phone :"));
-    if (phoneLineIndex !== -1) {
-      const phoneMatch = cleanedLines[phoneLineIndex].match(/\d{10}/);
-      if (phoneMatch) {
-        billData.storePhone = phoneMatch[0];
-      }
-    }
-    
-    // Extract customer name
-    const patientNameIndex = cleanedLines.findIndex((line: string) => line.startsWith("Patient Name :"));
-    if (patientNameIndex !== -1 && patientNameIndex + 1 < cleanedLines.length) {
-      // Check if there's content after the colon on the same line
-      const nameParts = cleanedLines[patientNameIndex].split(":");
-      if (nameParts.length > 1 && nameParts[1].trim()) {
-        billData.customerName = nameParts[1].trim();
-      } 
-      // Otherwise, customer name might be on the next line if it's not a label
-      else if (!cleanedLines[patientNameIndex + 1].includes(":")) {
-        billData.customerName = cleanedLines[patientNameIndex + 1];
-      }
-    }
-    
-    // Use a generic customer phone if not found
-    billData.customerPhone = "9999999999"; // Default phone number if not found
-    
-    // Parse items - for GST invoice format
-    // Look for table headers first
-    const tableHeaderIndex = cleanedLines.findIndex((line: string | string[]) => 
-      line.includes("PRODUCT NAME") && line.includes("BATCH") && line.includes("MRP")
-    );
-    
-    if (tableHeaderIndex !== -1) {
-      let i = tableHeaderIndex + 1;
-      
-      while (i < cleanedLines.length) {
-        // Look for lines that start with a number followed by a period (e.g., "1.")
-        if (cleanedLines[i].match(/^\d+\./)) {
-          // const itemNumber = parseInt(cleanedLines[i].replace(".", ""));
-          
-          // Next line should be the product name
-          const productName = i + 1 < cleanedLines.length ? cleanedLines[i + 1] : "";
-          
-          // Following lines should contain pack, HSN, batch, exp, qty, mrp, rate, taxes, amount
-          let j = i + 2;
-          let packSize = "";
-          let batch = "";
-          let expiry = "";
-          let quantity = 0;
-          let mrp = 0;
-          let amount = 0;
-          
-          // Parse numerical values
-          while (j < cleanedLines.length && !cleanedLines[j].match(/^\d+\./) && !cleanedLines[j].includes("SUB TOTAL")) {
-            const line = cleanedLines[j];
-            
-            // Try to identify what this line contains based on the value format
-            if (line.match(/^\d+$/)) {
-              // Could be pack size, quantity, or batch number
-              if (!packSize) {
-                packSize = line;
-              } else if (!quantity) {
-                quantity = parseInt(line);
-              } else if (!batch) {
-                batch = line;
-              }
-            } 
-            else if (line.match(/^\d+\.\d{2}$/)) {
-              // Monetary values with decimal points
-              if (!mrp) {
-                mrp = parseFloat(line);
-              } else if (!amount && parseFloat(line) > 100) {
-                // Assume larger values are the amount
-                amount = parseFloat(line);
-              }
-            }
-            
-            j++;
-          }
-          
-          // If we found an amount but not quantity, assume quantity is 1
-          if (amount > 0 && !quantity) {
-            quantity = 1;
-          }
-          
-          // Add the item if we have at least product name and amount
-          if (productName && amount > 0) {
-            billData.items.push({
-              item: productName,
-              quantity: quantity || 1,
-              batch: batch || "",
-              expBatch: expiry || "",
-              mrp: mrp || amount,
-              discount: 0 // No discount information in this format
-            });
-          }
-          
-          // Move to the next item or exit if we hit the subtotal
-          if (j < cleanedLines.length && cleanedLines[j].includes("SUB TOTAL")) {
-            break;
-          }
-          
-          i = j;
-        } else {
-          i++;
-        }
-      }
-    }
-    
-    // Extract total amount
-    const grandTotalIndex = cleanedLines.findIndex((line: string) => line === "GRAND TOTAL");
-    if (grandTotalIndex !== -1 && grandTotalIndex + 1 < cleanedLines.length) {
-      const totalLine = cleanedLines[grandTotalIndex + 1];
-      if (totalLine.match(/^\d+\.\d{2}$/)) {
-        billData.calculatedAmount = parseFloat(totalLine);
-      }
+    // Extract date - look for DD-MM-YYYY format
+    const dateIndex = cleanedLines.findIndex((line: string) => line.match(/^\d{2}-\d{2}-\d{4}$/));
+    if (dateIndex !== -1) {
+      const [day, month, year] = cleanedLines[dateIndex].split('-');
+      billData.date = new Date(`${year}-${month}-${day}`);
     } else {
-      // Alternative: look for SUB TOTAL
-      const subTotalIndex = cleanedLines.findIndex((line: string) => line === "SUB TOTAL");
-      if (subTotalIndex !== -1 && subTotalIndex + 1 < cleanedLines.length) {
-        const totalLine = cleanedLines[subTotalIndex + 1];
-        if (totalLine.match(/^\d+\.\d{2}$/)) {
-          billData.calculatedAmount = parseFloat(totalLine);
-        }
+      billData.date = new Date();
+    }
+    
+    // Extract customer name (usually after date)
+    const nameIndex = dateIndex !== -1 ? dateIndex + 1 : 0;
+    if (nameIndex < cleanedLines.length && !cleanedLines[nameIndex].startsWith("TIME:") && 
+        !cleanedLines[nameIndex].match(/^\d{10}$/)) {
+      billData.customerName = cleanedLines[nameIndex];
+    }
+    
+    // Extract customer phone (10 digit number)
+    const phoneIndex = cleanedLines.findIndex((line: string) => line.match(/^\d{10}$/));
+    if (phoneIndex !== -1) {
+      billData.customerPhone = cleanedLines[phoneIndex];
+    }
+    
+    // Extract payment type
+    const paymentIndex = cleanedLines.findIndex((line: string | string[]) => line.includes("BILL"));
+    if (paymentIndex !== -1) {
+      billData.paymentType = cleanedLines[paymentIndex].toLowerCase().includes("cash") ? "cash" : cleanedLines[paymentIndex];
+    }
+    
+    // Extract store name and location (after payment type)
+    if (paymentIndex !== -1 && paymentIndex + 1 < cleanedLines.length) {
+      billData.storeName = cleanedLines[paymentIndex + 1];
+      
+      if (paymentIndex + 2 < cleanedLines.length) {
+        billData.storeLocation = cleanedLines[paymentIndex + 2];
       }
     }
     
-    // Extract amount in words
-    const amountTextIndex = cleanedLines.findIndex((line: string) => line.startsWith("Rs."));
+    // Extract store phone (typically after store location)
+    const storePhoneIndex = cleanedLines.findIndex((line: string, index: number) => 
+      line.match(/^\d{10}$/) && index > phoneIndex && line !== billData.customerPhone
+    );
+    if (storePhoneIndex !== -1) {
+      billData.storePhone = cleanedLines[storePhoneIndex];
+    }
+    
+    // Find amount text (contains "Rs." and "Only")
+    const amountTextIndex = cleanedLines.findIndex((line: string) => 
+      (line.startsWith("Rs.") || line.startsWith("₹")) && line.includes("Only")
+    );
+    
+    // Extract monetary values (they come after the amount text)
     if (amountTextIndex !== -1) {
       billData.amountText = cleanedLines[amountTextIndex];
+      
+      // The next few lines should contain the monetary values
+      const totalAmountIndex = amountTextIndex + 1;
+      const discountIndex = amountTextIndex + 2;
+      const finalAmountIndex = amountTextIndex + 3;
+      
+      if (totalAmountIndex < cleanedLines.length && 
+          cleanedLines[totalAmountIndex].match(/^\d+\.\d{2}$/)) {
+        billData.calculatedAmount = parseFloat(cleanedLines[totalAmountIndex]);
+      }
+      
+      if (discountIndex < cleanedLines.length && 
+          cleanedLines[discountIndex].match(/^\d+\.\d{2}$/)) {
+        billData.netDiscount = parseFloat(cleanedLines[discountIndex]);
+        billData.creditAmount = parseFloat(cleanedLines[discountIndex]);
+      }
+      
+      if (finalAmountIndex < cleanedLines.length && 
+          cleanedLines[finalAmountIndex].match(/^\d+\.\d{2}$/)) {
+        // Use calculatedAmount instead of finalAmount for amountPaid
+        billData.amountPaid = billData.calculatedAmount;
+      }
     }
     
-    // Set payment type to cash by default for GST invoices
-    billData.paymentType = "cash";
+    // Extract items - more robust item detection
+    const medicineItems: any[] = [];
     
-    // Debug log the extracted data
-    console.log("Extracted data:", billData);
+    // Find potential item starting points (quantities)
+    const itemStartIndices: number[] = [];
+    cleanedLines.forEach((line: string, index: number) => {
+      // Items typically start with a single digit quantity (1-9)
+      if ((line.match(/^[1-9]$/) || line.match(/^[1-9]:[0-9]$/)) && 
+      index < cleanedLines.length - 5) {
+        itemStartIndices.push(index);
+      }
+    });
+    
+    // Process each potential item
+    for (let i = 0; i < itemStartIndices.length; i++) {
+      const startIndex = itemStartIndices[i];
+      const endIndex = i < itemStartIndices.length - 1 
+        ? itemStartIndices[i + 1] 
+        : cleanedLines.length;
+      
+      // Get all lines that might be part of this item
+      const itemLines = cleanedLines.slice(startIndex, endIndex);
+      
+      // Basic validation - we need at least quantity, name, batch, expiry, MRP, discount
+      if (itemLines.length < 6) continue;
+      
+      // Parse quantity
+      const quantity = parseInt(itemLines[0]);
+      if (isNaN(quantity)) continue;
+      
+      // Item name is typically the line after quantity
+      const itemName = itemLines[1];
+      
+      // Find batch number (typically numeric)
+      const batchIndex = itemLines.findIndex((line: string, idx: number) => 
+        idx > 1 && line.match(/^\d+$/)
+      );
+      if (batchIndex === -1) continue;
+      
+      // Find expiry (typically in format MM/YY)
+      const expiryIndex = itemLines.findIndex((line: string, idx: number) => 
+        idx > batchIndex && line.match(/^\d{1,2}\/\d{2,4}$/)
+      );
+      if (expiryIndex === -1) continue;
+      
+      // Find MRP (decimal number)
+      const mrpIndex = itemLines.findIndex((line: string, idx: number) => 
+        idx > expiryIndex && line.match(/^\d+\.\d{2}$/)
+      );
+      if (mrpIndex === -1) continue;
+      
+      // Find discount (decimal or whole number)
+      const discountIndex = itemLines.findIndex((line: string, idx: number) => 
+        idx > mrpIndex && line.match(/^\d+(\.\d{2})?$/)
+      );
+      if (discountIndex === -1) continue;
+      
+      // Create item object
+      const item = {
+        quantity,
+        item: itemName,
+        batch: itemLines[batchIndex],
+        expBatch: itemLines[expiryIndex],
+        mrp: parseFloat(itemLines[mrpIndex]),
+        discount: parseFloat(itemLines[discountIndex])
+      };
+      
+      medicineItems.push(item);
+    }
+    
+    // Update items array if we found any valid items
+    if (medicineItems.length > 0) {
+      billData.items = medicineItems;
+    }
+    
+    // Debug log the extracted items
     console.log("Extracted items:", billData.items);
     
-    // Find or create customer - use default phone if none found
+    // Find or create customer
     let customer = await prisma.customer.findUnique({
       where: { phone: billData.customerPhone }
     });
@@ -219,7 +203,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
       customer = await prisma.customer.create({
         data: {
           name: billData.customerName || "Unknown Customer",
-          phone: billData.customerPhone, // Using default phone number
+          phone: billData.customerPhone || `Unknown-${Date.now()}`,
           address: null,
         }
       });
@@ -233,7 +217,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
     if (!store) {
       store = await prisma.store.create({
         data: {
-          storeName: billData.storeName || "Unknown Store",
+          storeName: billData.storeName,
           address: billData.storeLocation || null,
           phone: billData.storePhone || null,
         }
@@ -262,10 +246,10 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
         customerId: customer.id,
         storeId: store.id,
         date: billData.date || new Date(),
-        netDiscount: 0, // GST invoices typically don't have discounts
+        netDiscount: billData.netDiscount || 0,
         netAmount: 0, // Not using this field as per requirement
-        amountPaid: billData.calculatedAmount || 0,
-        creditAmount: 0, // No credit for GST invoice
+        amountPaid: billData.calculatedAmount || 0, // Use calculated amount (162.20)
+        creditAmount: billData.netDiscount || 0, // Use netDiscount (32.44)
         paymentType: billData.paymentType || "cash",
         isUploaded: true,
         billDetails: {

@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { NonBuyingCustomer } from "./types";
 
 // Interface for customer data
 interface Customer {
@@ -518,5 +519,114 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = "CustomerReport_Detailed.pdf";
+  link.click();
+};
+
+
+export const exportNonBuyingToExcel = (data: NonBuyingCustomer[]) => {
+  if (!data || data.length === 0) {
+    alert("No data available to export.");
+    return;
+  }
+
+  const formattedData = data.map((customer) => ({
+    "Customer Name": customer.name,
+    "Phone Number": customer.phone,
+    "Last Purchase Date": customer.lastPurchaseDate
+      ? new Date(customer.lastPurchaseDate).toLocaleDateString("en-IN")
+      : "Never",
+    "Total Purchase Value": `Rs${customer.totalPurchaseValue.toLocaleString("en-IN", {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    })}`,
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(formattedData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Non-Buying Customers");
+
+  XLSX.writeFile(workbook, "NonBuyingCustomers.xlsx");
+};
+
+/**
+ * Export Non-Buying Customer data to PDF
+ */
+export const exportNonBuyingToPDF = async (data: NonBuyingCustomer[]) => {
+  if (!data || data.length === 0) {
+    alert("No data available to export.");
+    return;
+  }
+
+  const pdfDoc = await PDFDocument.create();
+  let page = pdfDoc.addPage([612, 792]); // Standard US Letter size
+  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  let yPosition = page.getHeight() - 50;
+
+  // Title
+  page.drawText("Non-Buying Customers Report", {
+    x: 50,
+    y: yPosition,
+    size: 18,
+    font: helveticaBold,
+    color: rgb(0, 0, 0),
+  });
+
+  yPosition -= 30;
+
+  // Table Header
+  const headers = ["Customer Name", "Phone Number", "Last Purchase Date", "Total Purchase Value"];
+  const colWidths = [150, 150, 150, 150];
+
+  headers.forEach((header, index) => {
+    page.drawText(header, {
+      x: 50 + colWidths.slice(0, index).reduce((a, b) => a + b, 0),
+      y: yPosition,
+      size: 10,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+  });
+
+  yPosition -= 20;
+
+  // Table Rows
+  data.forEach((customer) => {
+    if (yPosition < 50) {
+      page = pdfDoc.addPage([612, 792]);
+      yPosition = page.getHeight() - 50;
+    }
+
+    const row = [
+      customer.name,
+      customer.phone,
+      customer.lastPurchaseDate
+        ? new Date(customer.lastPurchaseDate).toLocaleDateString("en-IN")
+        : "Never",
+      `Rs${customer.totalPurchaseValue.toLocaleString("en-IN", {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 2,
+      })}`,
+    ];
+
+    row.forEach((cell, index) => {
+      page.drawText(cell, {
+        x: 50 + colWidths.slice(0, index).reduce((a, b) => a + b, 0),
+        y: yPosition,
+        size: 10,
+        font: helvetica,
+        color: rgb(0, 0, 0),
+      });
+    });
+
+    yPosition -= 20;
+  });
+
+  const pdfBytes = await pdfDoc.save();
+  const blob = new Blob([pdfBytes], { type: "application/pdf" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "NonBuyingCustomers.pdf";
   link.click();
 };

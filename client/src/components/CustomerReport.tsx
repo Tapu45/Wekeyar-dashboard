@@ -33,6 +33,19 @@ const fetchCustomerReport = async (startDate: string, endDate: string, search: s
   return data;
 };
 
+const getUserRole = () => {
+  const token = localStorage.getItem("token");
+  if (!token) return null;
+
+  try {
+    const decoded = JSON.parse(atob(token.split(".")[1]));
+    return decoded.role;
+  } catch (error) {
+    console.error("Failed to decode token:", error);
+    return null;
+  }
+};
+
 const CustomerReportPage = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -159,6 +172,8 @@ const CustomerReportPage = () => {
     </div>
   );
 
+  const userRole = getUserRole();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -236,6 +251,7 @@ const CustomerReportPage = () => {
 </div>
 
 {/* Export Buttons */}
+{userRole === "admin" && (
 <div className="flex justify-end space-x-4 mb-4">
           <button
             onClick={() => handleExport(data)}
@@ -250,6 +266,7 @@ const CustomerReportPage = () => {
             Export Detailed
           </button>
         </div>
+        )}
   
         {/* Data Table */}
         {isLoading ? (

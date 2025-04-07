@@ -237,3 +237,6 @@ export const sendLogUpdate = (uploadId: number, log: string): void => {
     connection.write(`data: ${JSON.stringify({ log })}\n\n`);
   }
 };
+
+
+

@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Search
 } from "lucide-react"
+import { exportNonBuyingToExcel, exportNonBuyingToPDF } from "../utils/Exportutils"
 
 export interface MonthlyNonBuyingCustomer {
   id: number
@@ -35,6 +36,19 @@ export interface MonthlyNonBuyingCustomer {
 const getMonthlyNonBuyingCustomers = async (): Promise<MonthlyNonBuyingCustomer[]> => {
   const { data } = await api.get(API_ROUTES.NON_BUYING_CUSTOMERS)
   return data
+}
+
+const getUserRole = () => {
+  const token = localStorage.getItem("token")
+  if (!token) return null
+
+  try {
+    const decoded = JSON.parse(atob(token.split(".")[1]))
+    return decoded.role
+  } catch (error) {
+    console.error("Failed to decode token:", error)
+    return null
+  }
 }
 
 const NonBuyingMonthlyCustomer: React.FC = () => {
@@ -137,6 +151,31 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
       },
     },
   })
+
+  const handleExport = () => {
+    const input = window.prompt("Enter export format: 'excel' or 'pdf'");
+    const format = input ? input.toLowerCase() : "";
+
+    if (format === "excel") {
+      exportNonBuyingToExcel(
+        filteredData.map(customer => ({
+          ...customer,
+          totalPurchaseValue: 0, // Default value or calculate if available
+        }))
+      ); // Export to Excel
+    } else if (format === "pdf") {
+      exportNonBuyingToPDF(
+        filteredData.map(customer => ({
+          ...customer,
+          totalPurchaseValue: 0, // Default value or calculate if available
+        }))
+      ); // Export to PDF
+    } else {
+      alert("Invalid format. Please enter 'excel' or 'pdf'.");
+    }
+  };
+
+  const userRole = getUserRole()
 
   if (isLoading) {
     return (
@@ -288,6 +327,18 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
             </select>
             <span className="text-sm text-gray-600">entries</span>
           </div>
+          {userRole === "admin" && (
+          <div className="flex justify-end mb-4">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleExport}
+              className="px-4 py-2 font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            >
+              Export Data
+            </motion.button>
+          </div>
+        )}
         </div>
 
         <div className="overflow-hidden border border-gray-200 rounded-xl">

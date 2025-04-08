@@ -16,6 +16,7 @@ const http_1 = __importDefault(require("http"));
 const client_1 = require("@prisma/client");
 const Socket_1 = __importDefault(require("./utils/Socket"));
 const socket_io_1 = require("socket.io");
+const productRoute_1 = __importDefault(require("./routes/productRoute"));
 const app = (0, express_1.default)();
 const prisma = new client_1.PrismaClient();
 const server = http_1.default.createServer(app);
@@ -37,6 +38,7 @@ app.use("/api", upload_route_1.default);
 app.use("/auth", authRoutes_1.default);
 app.use("/user", userRoutes_1.default);
 app.use("/telecalling", telicallingRoutes_1.default);
+app.use("/products", productRoute_1.default);
 app.use((err, _req, res, _next) => {
     console.error(err.stack);
     res.status(500).json({

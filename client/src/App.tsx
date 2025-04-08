@@ -21,6 +21,7 @@ import Tellecalling from "./components/tellecalling";
 import TelecallingDashboard from "./components/TelecallingDashboard";
 import TelecallerRemarksOrders from "./components/TelecallerHistory";
 import UploadStatusPage from "./components/UploadStatusPage";
+import ProductUploadPage from "./components/ProductUpload";
 
 const queryClient = new QueryClient();
 
@@ -144,6 +145,14 @@ const App: React.FC = () => {
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <TelecallingDashboard />
+                </ProtectedRoute>
+              }
+            />
+             <Route
+              path="productmaster-upload"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <ProductUploadPage />
                 </ProtectedRoute>
               }
             />

@@ -229,7 +229,7 @@ const getCustomerReport = async (req, res) => {
             }
             const dateEntry = customerEntry.dates.get(dateKey);
             dateEntry.totalAmount += bill.amountPaid - bill.creditAmount;
-            if (bill.billNo.startsWith("CS")) {
+            if (!bill.billNo.startsWith("CN")) {
                 dateEntry.salesBills.push({
                     billNo: bill.billNo,
                     amount: bill.amountPaid - bill.creditAmount,
@@ -239,7 +239,7 @@ const getCustomerReport = async (req, res) => {
                     })),
                 });
             }
-            else if (bill.billNo.startsWith("CN")) {
+            else {
                 dateEntry.returnBills.push({
                     billNo: bill.billNo,
                     amount: bill.amountPaid + bill.creditAmount,

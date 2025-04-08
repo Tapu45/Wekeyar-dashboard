@@ -40,5 +40,7 @@ export const API_ROUTES = {
     TELECALLING_UPDATE_REMARKS: "/telecalling/customers/:id/remarks", // Added route
     TELECALLER_REMARKS_ORDERS: "/telecalling/telecaller/remarks-orders", // Added route
     TELECALLING_ADD_CUSTOMER: "/telecalling/customers/new", // Added route
+    PRODUCT_UPLOAD: "/products/import-excel",
+    product_upload2: "/products/import-excel-buffer",
   };
   

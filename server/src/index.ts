@@ -11,6 +11,7 @@ import http from "http"; // Import HTTP module
 import { PrismaClient } from "@prisma/client"; // Import PrismaClient
 import setupSocketIO from "./utils/Socket";
 import { Server } from "socket.io";
+import productRoutes from "./routes/productRoute";
 
 const app = express();
 const prisma = new PrismaClient();
@@ -44,6 +45,7 @@ app.use("/api", uploadRoutes);
 app.use("/auth", authRoutes); 
 app.use("/user", userRoutes);
 app.use("/telecalling", tellicallingRoutes);
+app.use("/products", productRoutes);
 
 // Error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

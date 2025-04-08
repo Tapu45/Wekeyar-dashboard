@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Menu, Transition } from "@headlessui/react"; // For dropdown functionality
+import { Fragment } from "react"; 
 import api, { API_ROUTES } from "../utils/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -20,7 +22,7 @@ import {
 import {  exportDetailedToExcel, exportDetailedToPDF, exportNormalToExcel, exportNormalToPDF } from "../utils/Exportutils";
 
 const fetchCustomerReport = async (startDate: string, endDate: string, search: string, storeId: number| null) => {
-  const isBillNo = search.startsWith("CS/"); // Check if the input is a bill number
+  const isBillNo = /^[A-Z]+\/\d+/.test(search); // Check if the input is a bill number
   const { data } = await api.get(API_ROUTES.CUSTOMER_REPORT, {
     params: { 
       startDate, 
@@ -108,26 +110,93 @@ const CustomerReportPage = () => {
     }
   };
 
-  const handleExport = (type: "normal" | "detailed") => {
-    const input = window.prompt("Enter export format: 'excel' or 'pdf'");
-    const format = input ? input.toLowerCase() : "";
-  
-    if (format === "excel") {
-      if (type === "normal") {
-        exportNormalToExcel(data);
-      } else {
-        exportDetailedToExcel(data);
-      }
-    } else if (format === "pdf") {
-      if (type === "normal") {
-        exportNormalToPDF(data);
-      } else {
-        exportDetailedToPDF(data);
-      }
-    } else {
-      alert("Invalid format. Please enter 'excel' or 'pdf'.");
+  const handleExport = (type: "normal" | "detailed", format: "excel" | "pdf") => {
+    if (type === "normal" && format === "excel") {
+      exportNormalToExcel(data);
+    } else if (type === "normal" && format === "pdf") {
+      exportNormalToPDF(data);
+    } else if (type === "detailed" && format === "excel") {
+      exportDetailedToExcel(data);
+    } else if (type === "detailed" && format === "pdf") {
+      exportDetailedToPDF(data);
     }
   };
+
+  const ExportDropdown = () => (
+    <Menu as="div" className="relative inline-block text-left">
+      <div>
+        <Menu.Button className="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+          Export Options
+          <ChevronDown className="ml-2 -mr-1 h-5 w-5 text-gray-500" />
+        </Menu.Button>
+      </div>
+  
+      <Transition
+        as={Fragment}
+        enter="transition ease-out duration-100"
+        enterFrom="transform opacity-0 scale-95"
+        enterTo="transform opacity-100 scale-100"
+        leave="transition ease-in duration-75"
+        leaveFrom="transform opacity-100 scale-100"
+        leaveTo="transform opacity-0 scale-95"
+      >
+        <Menu.Items className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
+          <div className="py-1">
+            <Menu.Item>
+              {({ active }) => (
+                <button
+                  onClick={() => handleExport("normal", "excel")}
+                  className={`${
+                    active ? "bg-blue-100 text-blue-900" : "text-gray-700"
+                  } group flex items-center px-4 py-2 text-sm w-full`}
+                >
+                  Normal to Excel
+                </button>
+              )}
+            </Menu.Item>
+            <Menu.Item>
+              {({ active }) => (
+                <button
+                  onClick={() => handleExport("normal", "pdf")}
+                  className={`${
+                    active ? "bg-blue-100 text-blue-900" : "text-gray-700"
+                  } group flex items-center px-4 py-2 text-sm w-full`}
+                >
+                  Normal to PDF
+                </button>
+              )}
+            </Menu.Item>
+            <Menu.Item>
+              {({ active }) => (
+                <button
+                  onClick={() => handleExport("detailed", "excel")}
+                  className={`${
+                    active ? "bg-green-100 text-green-900" : "text-gray-700"
+                  } group flex items-center px-4 py-2 text-sm w-full`}
+                >
+                  Detailed to Excel
+                </button>
+              )}
+            </Menu.Item>
+            <Menu.Item>
+              {({ active }) => (
+                <button
+                  onClick={() => handleExport("detailed", "pdf")}
+                  className={`${
+                    active ? "bg-green-100 text-green-900" : "text-gray-700"
+                  } group flex items-center px-4 py-2 text-sm w-full`}
+                >
+                  Detailed to PDF
+                </button>
+              )}
+            </Menu.Item>
+          </div>
+        </Menu.Items>
+      </Transition>
+    </Menu>
+  );
+
+  
 
   const sortedData = data ? [...data].sort((a, b) => {
     const direction = sortDirection === "asc" ? 1 : -1;
@@ -251,22 +320,12 @@ const CustomerReportPage = () => {
 </div>
 
 {/* Export Buttons */}
+{/* Export Dropdown */}
 {userRole === "admin" && (
-<div className="flex justify-end space-x-4 mb-4">
-          <button
-            onClick={() => handleExport(data)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-blue-700 transition"
-          >
-            Export Normal
-          </button>
-          <button
-            onClick={() => handleExport(data)}
-            className="bg-green-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-green-700 transition"
-          >
-            Export Detailed
-          </button>
-        </div>
-        )}
+  <div className="flex justify-end mb-4">
+    <ExportDropdown />
+  </div>
+)}
   
         {/* Data Table */}
         {isLoading ? (

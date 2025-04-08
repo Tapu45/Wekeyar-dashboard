@@ -311,9 +311,10 @@ export const getCustomerReport = async (
 
       const dateEntry = customerEntry.dates.get(dateKey);
       dateEntry.totalAmount += bill.amountPaid - bill.creditAmount; // Use amountPaid instead of netAmount
-
+      
       // Group bills into sales or returns based on billNo prefix
-      if (bill.billNo.startsWith("CS")) {
+      if (!bill.billNo.startsWith("CN")) {
+        // Anything except CN is considered a sales bill
         dateEntry.salesBills.push({
           billNo: bill.billNo,
           amount: bill.amountPaid - bill.creditAmount, // Use amountPaid instead of netAmount
@@ -322,7 +323,8 @@ export const getCustomerReport = async (
             quantity: detail.quantity,
           })),
         });
-      } else if (bill.billNo.startsWith("CN")) {
+      } else {
+        // CN-prefixed bills are considered return bills
         dateEntry.returnBills.push({
           billNo: bill.billNo,
           amount: bill.amountPaid + bill.creditAmount, // Use amountPaid instead of netAmount

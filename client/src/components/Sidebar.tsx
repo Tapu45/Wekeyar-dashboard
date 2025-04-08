@@ -12,6 +12,7 @@ import {
   LogOut,
   Headset,
   FileCheck2,
+  CloudUpload,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -61,6 +62,7 @@ const Sidebar = ({
     { title: "Customer Report", path: "/customer-report", icon: BarChart3, roles: ["admin", "tellecaller"] },
     { title: "Store Sales Report", path: "/store-sales-report", icon: Store, roles: ["admin", "tellecaller"] },
     { title: "Upload", path: "/upload", icon: UploadCloud, roles: ["admin"] },
+    { title: "product upload", path: "/productmaster-upload", icon: CloudUpload, roles: ["admin"] },
     {
       title: "Upload Status",
       path: "/upload-status",

@@ -7,11 +7,11 @@ const NavBar: React.FC = () => {
   return (
     <nav className="sticky top-0 bg-white shadow-md rounded-lg px-6 py-4 flex flex-wrap gap-2 md:gap-6">
       {[
-        { path: "/", label: "Summary Report" },
-        { path: "/non-buying-customers", label: "Non-Buying Customers" },
+        { path: "/", label: "Summary Report"},
+        { path: "/non-buying-customers", label: "Non-Buying Customers"},
         { path: "/non-buying-monthly-customers", label: "Monthly Non-Buying Customers" },
         { path: "/customer-report", label: "Customer Report" },
-        { path: "/store-sales-report", label: "Store Sales Report" }
+        { path: "/store-sales-report", label: "Store Sales Report"}
       ].map((item) => (
         <Link
           key={item.path}

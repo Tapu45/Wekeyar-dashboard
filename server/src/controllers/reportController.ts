@@ -550,15 +550,19 @@ export const getAllCustomers = async (
 
 export const getInactiveCustomers = async (req: Request, res: Response) => {
   try {
-    const { fromDate, toDate } = req.query;
+    const { fromDate, toDate, page = 1, pageSize = 100 } = req.query;
 
-    // Default date range: current monzth and previous month
+    // Default date range: current month and previous month
     const today = new Date();
     const defaultFromDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     const defaultToDate = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
 
     const startDate = fromDate ? new Date(fromDate as string) : defaultFromDate;
     const endDate = toDate ? new Date(toDate as string) : defaultToDate;
+
+    // Pagination logic
+    const skip = (Number(page) - 1) * Number(pageSize);
+    const take = Number(pageSize);
 
     // Fetch customers with no bills in the specified date range
     const customers = await prisma.customer.findMany({
@@ -582,6 +586,8 @@ export const getInactiveCustomers = async (req: Request, res: Response) => {
           take: 1,
         },
       },
+      skip,
+      take,
     });
 
     // Fetch statuses from the TelecallingCustomer table
@@ -623,7 +629,29 @@ export const getInactiveCustomers = async (req: Request, res: Response) => {
         status: statusMap.get(customer.id) || "inactive", // Default to "inactive" if no status is found
       }));
 
-    res.json(result);
+    // Total count of inactive customers
+    const totalCount = await prisma.customer.count({
+      where: {
+        bills: {
+          none: {
+            date: {
+              gte: startDate,
+              lte: endDate,
+            },
+          },
+        },
+      },
+    });
+
+    // Determine if there are more pages
+    const hasMore = skip + take < totalCount;
+
+    // Return the response in the expected format
+    res.json({
+      items: result,
+      totalCount,
+      hasMore,
+    });
   } catch (error) {
     console.error("Error fetching inactive customers:", error);
     res.status(500).json({ error: "Internal server error" });

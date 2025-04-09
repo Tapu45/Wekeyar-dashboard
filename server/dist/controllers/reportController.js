@@ -398,12 +398,14 @@ const getAllCustomers = async (_req, res) => {
 exports.getAllCustomers = getAllCustomers;
 const getInactiveCustomers = async (req, res) => {
     try {
-        const { fromDate, toDate } = req.query;
+        const { fromDate, toDate, page = 1, pageSize = 100 } = req.query;
         const today = new Date();
         const defaultFromDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         const defaultToDate = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
         const startDate = fromDate ? new Date(fromDate) : defaultFromDate;
         const endDate = toDate ? new Date(toDate) : defaultToDate;
+        const skip = (Number(page) - 1) * Number(pageSize);
+        const take = Number(pageSize);
         const customers = await exports.prisma.customer.findMany({
             where: {
                 bills: {
@@ -425,6 +427,8 @@ const getInactiveCustomers = async (req, res) => {
                     take: 1,
                 },
             },
+            skip,
+            take,
         });
         const telecallingStatuses = await exports.prisma.telecallingCustomer.findMany({
             where: {
@@ -455,7 +459,24 @@ const getInactiveCustomers = async (req, res) => {
                 : null,
             status: statusMap.get(customer.id) || "inactive",
         }));
-        res.json(result);
+        const totalCount = await exports.prisma.customer.count({
+            where: {
+                bills: {
+                    none: {
+                        date: {
+                            gte: startDate,
+                            lte: endDate,
+                        },
+                    },
+                },
+            },
+        });
+        const hasMore = skip + take < totalCount;
+        res.json({
+            items: result,
+            totalCount,
+            hasMore,
+        });
     }
     catch (error) {
         console.error("Error fetching inactive customers:", error);

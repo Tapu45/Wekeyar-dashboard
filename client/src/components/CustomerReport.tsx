@@ -20,6 +20,7 @@ import {
   Package
 } from "lucide-react";
 import {  exportDetailedToExcel, exportDetailedToPDF, exportNormalToExcel, exportNormalToPDF } from "../utils/Exportutils";
+import { FaRupeeSign } from "react-icons/fa";
 
 const fetchCustomerReport = async (startDate: string, endDate: string, search: string, storeId: number| null) => {
   const isBillNo = /^[A-Z]+\/\d+/.test(search); // Check if the input is a bill number
@@ -384,7 +385,7 @@ const CustomerReportPage = () => {
                     onClick={() => handleSort("totalAmount")}
                   >
                     <div className="flex items-center">
-                      <DollarSign className="h-5 w-5 mr-2" /> Total Amount
+                      <FaRupeeSign className="h-5 w-5 mr-2" /> Total Amount
                       {sortField === "totalAmount" && (
                         sortDirection === "asc" ? 
                         <ArrowUp className="h-4 w-4 ml-1" /> : 

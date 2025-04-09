@@ -217,7 +217,7 @@ export const exportNormalToPDF = async (data: Customer[]) => {
       customer.customerName, 
       customer.mobileNo, 
       customer.totalBills.toString(),
-      `Rs${customer.totalAmount.toLocaleString('en-IN', {
+      `${customer.totalAmount.toLocaleString('en-IN', {
         maximumFractionDigits: 2,
         minimumFractionDigits: 2
       })}`
@@ -269,60 +269,21 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
   const pdfDoc = await PDFDocument.create();
   const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  
-  // Add cover page
-  let page = pdfDoc.addPage([612, 792]); // Standard US Letter size
-  
-  // Set margins and starting positions
+
   const margin = 50;
-  const pageWidth = page.getWidth() - margin * 2;
-  let yPosition = page.getHeight() - 200;
-  
-  // Draw title
-  page.drawText("Detailed Customer Report", {
-    x: margin,
-    y: yPosition,
-    size: 24,
-    font: helveticaBold,
-    color: rgb(0, 0, 0),
-  });
-  
-  yPosition -= 40;
-  
-  // Add date
-  const today = new Date().toLocaleDateString('en-IN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-  
-  page.drawText(`Generated on: ${today}`, {
-    x: margin,
-    y: yPosition,
-    size: 12,
-    font: helvetica,
-    color: rgb(0, 0, 0),
-  });
-  
-  yPosition -= 40;
-  
-  page.drawText(`Total Customers: ${data.length}`, {
-    x: margin,
-    y: yPosition,
-    size: 12,
-    font: helvetica,
-    color: rgb(0, 0, 0),
-  });
-  
-  // Add customers' data pages
+  const pageWidth = 612 - margin * 2;
+  let page = pdfDoc.addPage([612, 792]);
+  let yPosition = page.getHeight() - margin;
+
   for (const customer of data) {
     if (!customer.dates || customer.dates.length === 0) continue;
-    
-    // Add a new page for each customer
-    page = pdfDoc.addPage([612, 792]);
-    yPosition = page.getHeight() - margin;
-    
-    // Customer header
+
+    // Add customer header
+    if (yPosition < margin + 100) {
+      page = pdfDoc.addPage([612, 792]);
+      yPosition = page.getHeight() - margin;
+    }
+
     page.drawRectangle({
       x: margin,
       y: yPosition - 15,
@@ -330,7 +291,7 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
       height: 30,
       color: rgb(0.9, 0.9, 0.9),
     });
-    
+
     page.drawText(`Customer: ${customer.customerName}`, {
       x: margin + 10,
       y: yPosition - 10,
@@ -338,9 +299,9 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
       font: helveticaBold,
       color: rgb(0, 0, 0),
     });
-    
+
     yPosition -= 30;
-    
+
     page.drawText(`Mobile: ${customer.mobileNo}`, {
       x: margin + 10,
       y: yPosition,
@@ -348,7 +309,7 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
       font: helvetica,
       color: rgb(0, 0, 0),
     });
-    
+
     page.drawText(`Total Bills: ${customer.totalBills}`, {
       x: margin + 200,
       y: yPosition,
@@ -356,10 +317,10 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
       font: helvetica,
       color: rgb(0, 0, 0),
     });
-    
+
     page.drawText(`Total Amount: Rs${customer.totalAmount.toLocaleString('en-IN', {
       maximumFractionDigits: 2,
-      minimumFractionDigits: 2
+      minimumFractionDigits: 2,
     })}`, {
       x: margin + 350,
       y: yPosition,
@@ -367,17 +328,16 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
       font: helvetica,
       color: rgb(0, 0, 0),
     });
-    
+
     yPosition -= 30;
-    
+
     // Draw table for each date
     for (const date of customer.dates) {
-      // Check if we need a new page
-      if (yPosition < margin + 150) {
+      if (yPosition < margin + 100) {
         page = pdfDoc.addPage([612, 792]);
         yPosition = page.getHeight() - margin;
       }
-      
+
       // Date header
       page.drawRectangle({
         x: margin,
@@ -386,7 +346,7 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
         height: 25,
         color: rgb(0.8, 0.8, 0.9),
       });
-      
+
       page.drawText(`Date: ${date.date}`, {
         x: margin + 10,
         y: yPosition - 10,
@@ -394,10 +354,10 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
         font: helveticaBold,
         color: rgb(0, 0, 0),
       });
-      
+
       page.drawText(`Amount: Rs${date.totalAmount.toLocaleString('en-IN', {
         maximumFractionDigits: 2,
-        minimumFractionDigits: 2
+        minimumFractionDigits: 2,
       })}`, {
         x: pageWidth - 100,
         y: yPosition - 10,
@@ -405,9 +365,9 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
         font: helveticaBold,
         color: rgb(0, 0, 0),
       });
-      
+
       yPosition -= 35;
-      
+
       // Sales Bills
       if (date.salesBills.length > 0) {
         page.drawText("Sales Bills:", {
@@ -417,16 +377,15 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
           font: helveticaBold,
           color: rgb(0, 0, 0),
         });
-        
+
         yPosition -= 20;
-        
+
         for (const bill of date.salesBills) {
-          // Check if we need a new page
           if (yPosition < margin + 50) {
             page = pdfDoc.addPage([612, 792]);
             yPosition = page.getHeight() - margin;
           }
-          
+
           page.drawText(`Bill No: ${bill.billNo}`, {
             x: margin + 20,
             y: yPosition,
@@ -434,10 +393,10 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
             font: helvetica,
             color: rgb(0, 0, 0),
           });
-          
+
           page.drawText(`Amount: Rs${bill.amount.toLocaleString('en-IN', {
             maximumFractionDigits: 2,
-            minimumFractionDigits: 2
+            minimumFractionDigits: 2,
           })}`, {
             x: margin + 200,
             y: yPosition,
@@ -445,21 +404,20 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
             font: helvetica,
             color: rgb(0, 0, 0),
           });
-          
+
           yPosition -= 15;
         }
       }
-      
+
       yPosition -= 10;
-      
+
       // Return Bills
       if (date.returnBills.length > 0) {
-        // Check if we need a new page
         if (yPosition < margin + 100) {
           page = pdfDoc.addPage([612, 792]);
           yPosition = page.getHeight() - margin;
         }
-        
+
         page.drawText("Return Bills:", {
           x: margin + 10,
           y: yPosition,
@@ -467,16 +425,15 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
           font: helveticaBold,
           color: rgb(0, 0, 0),
         });
-        
+
         yPosition -= 20;
-        
+
         for (const bill of date.returnBills) {
-          // Check if we need a new page
           if (yPosition < margin + 50) {
             page = pdfDoc.addPage([612, 792]);
             yPosition = page.getHeight() - margin;
           }
-          
+
           page.drawText(`Bill No: ${bill.billNo}`, {
             x: margin + 20,
             y: yPosition,
@@ -484,10 +441,10 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
             font: helvetica,
             color: rgb(0, 0, 0),
           });
-          
+
           page.drawText(`Amount: Rs${bill.amount.toLocaleString('en-IN', {
             maximumFractionDigits: 2,
-            minimumFractionDigits: 2
+            minimumFractionDigits: 2,
           })}`, {
             x: margin + 200,
             y: yPosition,
@@ -495,16 +452,31 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
             font: helvetica,
             color: rgb(0, 0, 0),
           });
-          
+
           yPosition -= 15;
         }
       }
-      
+
       yPosition -= 25; // Space between dates
     }
+
+    // Add separation line after customer
+    if (yPosition < margin + 50) {
+      page = pdfDoc.addPage([612, 792]);
+      yPosition = page.getHeight() - margin;
+    }
+
+    page.drawLine({
+      start: { x: margin, y: yPosition },
+      end: { x: pageWidth + margin, y: yPosition },
+      thickness: 1,
+      color: rgb(0.7, 0.7, 0.7),
+    });
+
+    yPosition -= 20; // Space after separation line
   }
-  
-  // Footer on last page
+
+  // Footer on the last page
   page.drawText("© Your Company Name - All Rights Reserved", {
     x: margin,
     y: margin,
@@ -512,7 +484,7 @@ export const exportDetailedToPDF = async (data: Customer[]) => {
     font: helvetica,
     color: rgb(0.5, 0.5, 0.5),
   });
-  
+
   // Save PDF
   const pdfBytes = await pdfDoc.save();
   const blob = new Blob([pdfBytes], { type: "application/pdf" });

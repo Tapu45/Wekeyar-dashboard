@@ -52,17 +52,31 @@ const saveTelecallingOrder = async (req, res) => {
             return;
         }
         const { telecallingCustomerId, products, remarks } = req.body;
-        const customerExists = await prisma.telecallingCustomer.findFirst({
+        let telecallingCustomer = await prisma.telecallingCustomer.findFirst({
             where: { customerId: telecallingCustomerId },
         });
-        if (!customerExists) {
-            res.status(400).json({ error: "Invalid telecallingCustomerId. Customer does not exist." });
-            return;
+        if (!telecallingCustomer) {
+            const inactiveCustomer = await prisma.customer.findUnique({
+                where: { id: telecallingCustomerId },
+            });
+            if (!inactiveCustomer) {
+                res.status(400).json({ error: "Invalid telecallingCustomerId. Customer does not exist." });
+                return;
+            }
+            telecallingCustomer = await prisma.telecallingCustomer.create({
+                data: {
+                    customerId: inactiveCustomer.id,
+                    customerName: inactiveCustomer.name,
+                    customerPhone: inactiveCustomer.phone,
+                    storeName: null,
+                    remarks: remarks || null,
+                },
+            });
         }
         const telecallerId = req.user.id;
         const order = await prisma.telecallingOrder.create({
             data: {
-                telecallingCustomerId: customerExists.id,
+                telecallingCustomerId: telecallingCustomer.id,
                 telecallerId,
                 orderDetails: {
                     create: products.map((product) => ({
@@ -78,7 +92,7 @@ const saveTelecallingOrder = async (req, res) => {
         });
         if (remarks) {
             await prisma.telecallingCustomer.update({
-                where: { id: customerExists.id },
+                where: { id: telecallingCustomer.id },
                 data: { remarks },
             });
         }
@@ -235,12 +249,32 @@ const updateCustomerRemarks = async (req, res) => {
             res.status(400).json({ error: "Remarks are required" });
             return;
         }
-        const customer = await prisma.telecallingCustomer.findFirst({
+        let customer = await prisma.telecallingCustomer.findFirst({
             where: { customerId: Number(id) },
         });
         if (!customer) {
-            res.status(404).json({ error: "Customer not found" });
-            return;
+            const inactiveCustomer = await prisma.customer.findUnique({
+                where: { id: Number(id) },
+            });
+            if (!inactiveCustomer) {
+                res.status(404).json({ error: "Customer not found in the main Customer table." });
+                return;
+            }
+            customer = await prisma.telecallingCustomer.create({
+                data: {
+                    customerId: inactiveCustomer.id,
+                    customerName: inactiveCustomer.name,
+                    customerPhone: inactiveCustomer.phone,
+                    storeName: null,
+                    remarks,
+                },
+            });
+        }
+        else {
+            await prisma.telecallingCustomer.update({
+                where: { id: customer.id },
+                data: { remarks },
+            });
         }
         const telecallerId = req.user?.id;
         if (!telecallerId) {

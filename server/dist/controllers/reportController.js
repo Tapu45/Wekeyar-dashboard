@@ -172,7 +172,7 @@ const getCustomerReport = async (req, res) => {
                 lte: end,
             };
         }
-        if (storeId) {
+        if (storeId && Number(storeId) !== 0) {
             whereCondition.storeId = Number(storeId);
         }
         if (billNo) {

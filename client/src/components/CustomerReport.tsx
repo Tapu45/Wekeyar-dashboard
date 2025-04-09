@@ -11,7 +11,6 @@ import {
   User, 
   Phone, 
   FileText, 
-  DollarSign, 
   ArrowDown, 
   ArrowUp, 
   ShoppingCart, 
@@ -265,22 +264,21 @@ const CustomerReportPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
   {/* Store Selection */}
   <div className="relative">
-    <label className="block text-sm font-medium text-blue-700 mb-1">Select Store</label>
-    <select
-      className="block w-full border border-blue-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
-      value={selectedStore || ""}
-      onChange={(e) => setSelectedStore(Number(e.target.value))}
-    >
-      <option value="" disabled>
-        -- Select a Store --
+  <label className="block text-sm font-medium text-blue-700 mb-1">Select Store</label>
+  <select
+    className="block w-full border border-blue-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
+    value={selectedStore !== null ? selectedStore : ""} // Ensure 0 is handled correctly
+    onChange={(e) => setSelectedStore(e.target.value ? Number(e.target.value) : null)}
+  >
+    <option value="">Select Store</option> {/* Default option */}
+    <option value={0}>All Stores</option> {/* "All Stores" option */}
+    {stores.map((store) => (
+      <option key={store.id} value={store.id}>
+        {store.storeName}
       </option>
-      {stores.map((store) => (
-        <option key={store.id} value={store.id}>
-          {store.storeName}
-        </option>
-      ))}
-    </select>
-  </div>
+    ))}
+  </select>
+</div>
 
   {/* Start Date */}
   <div className="relative">
@@ -290,7 +288,7 @@ const CustomerReportPage = () => {
       value={startDate}
       onChange={(e) => setStartDate(e.target.value)}
       className="block w-full border border-blue-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
-      disabled={!selectedStore} // Disable if no store is selected
+      disabled={selectedStore === null} // Disable if no store is selected
     />
   </div>
 
@@ -302,7 +300,7 @@ const CustomerReportPage = () => {
       value={endDate}
       onChange={(e) => setEndDate(e.target.value)}
       className="block w-full border border-blue-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
-      disabled={!selectedStore} // Disable if no store is selected
+      disabled={selectedStore === null} // Disable if no store is selected
     />
   </div>
 
@@ -315,7 +313,7 @@ const CustomerReportPage = () => {
       onChange={(e) => setSearch(e.target.value)}
       placeholder="Search by Name, Mobile, or Bill No"
       className="block w-full border border-blue-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 bg-white"
-      disabled={!selectedStore} // Disable if no store is selected
+      disabled={selectedStore === null} // Disable if no store is selected
     />
   </div>
 </div>

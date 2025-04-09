@@ -576,7 +576,7 @@ export const exportNonBuyingToPDF = async (data: NonBuyingCustomer[]) => {
       customer.lastPurchaseDate
         ? new Date(customer.lastPurchaseDate).toLocaleDateString("en-IN")
         : "Never",
-      `Rs${customer.totalPurchaseValue.toLocaleString("en-IN", {
+      `${customer.totalPurchaseValue.toLocaleString("en-IN", {
         maximumFractionDigits: 2,
         minimumFractionDigits: 2,
       })}`,

@@ -39,6 +39,7 @@ const NonBuyingCustomerReport: React.FC = () => {
   const [visibleItems, setVisibleItems] = useState(10);
   const [selectedStore, setSelectedStore] = useState<number | null>(null); // Selected store ID
   const [stores, setStores] = useState<{ id: number; storeName: string }[]>([]); // List of stores
+  const [exportFormat, setExportFormat] = useState("");
 
   const { data, isLoading, error, refetch } = useQuery<NonBuyingCustomer[]>({
     queryKey: ["non-buying-customers", appliedDays, selectedStore],
@@ -71,16 +72,13 @@ const NonBuyingCustomerReport: React.FC = () => {
     fetchStores();
   }, []);
 
-  const handleExport = () => {
-    const input = window.prompt("Enter export format: 'excel' or 'pdf'");
-    const format = input ? input.toLowerCase() : "";
-
+  const handleExport = (format: string) => {
     if (format === "excel") {
       exportNonBuyingToExcel(data || []); // Export to Excel
     } else if (format === "pdf") {
       exportNonBuyingToPDF(data || []); // Export to PDF
     } else {
-      alert("Invalid format. Please enter 'excel' or 'pdf'.");
+      alert("Please select a valid export format.");
     }
   };
 
@@ -174,15 +172,21 @@ const NonBuyingCustomerReport: React.FC = () => {
         </div>
 
         {userRole === "admin" && (
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleExport}
-            className="px-4 py-2 font-medium text-white bg-blue-600 rounded-md shadow-md hover:bg-blue-700 text-sm"
-          >
-            Export Data
-          </motion.button>
-        )}
+  <div className="flex items-center space-x-4">
+    <select
+      value={exportFormat}
+      onChange={(e) => {
+        setExportFormat(e.target.value);
+        if (e.target.value) handleExport(e.target.value); // Trigger export on selection
+      }}
+      className="w-40 border border-blue-300 rounded-md shadow-sm py-1 px-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+    >
+      <option value="">Export Format</option>
+      <option value="excel">Excel</option>
+      <option value="pdf">PDF</option>
+    </select>
+  </div>
+)}
       </div>
 
       <div className="p-6">

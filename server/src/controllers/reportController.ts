@@ -238,7 +238,7 @@ export const getCustomerReport = async (
     }
 
     // Filter by store ID
-    if (storeId) {
+    if (storeId && Number(storeId) !== 0) {
       whereCondition.storeId = Number(storeId);
     }
 

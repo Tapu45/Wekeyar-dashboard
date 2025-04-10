@@ -35,21 +35,7 @@ interface TelecallingOrder {
   };
 }
 
-interface NewProduct {
-  id: number;
-  productName: string;
-  quantity: number;
-  orderDate: string;
-  telecallingCustomer: {
-    id: number;
-    customerName: string;
-    customerPhone: string;
-  };
-  telecaller: {
-    id: number;
-    username: string;
-  };
-}
+
 
 interface TelecallerWithOrderCount {
   id: number;
@@ -61,7 +47,6 @@ interface TelecallerWithOrderCount {
 const TelecallingDashboard: React.FC = () => {
   const [telecallingOrders, setTelecallingOrders] = useState<TelecallingOrder[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<TelecallingOrder[]>([]);
-  const [newProducts, setNewProducts] = useState<NewProduct[]>([]);
   const [telecallersWithOrders, setTelecallersWithOrders] = useState<TelecallerWithOrderCount[]>([]);
   const [filteredTelecallers, setFilteredTelecallers] = useState<TelecallerWithOrderCount[]>([]);
   const [loading, setLoading] = useState(false);
@@ -95,10 +80,6 @@ const TelecallingDashboard: React.FC = () => {
         const ordersResponse = await api.get(API_ROUTES.TELECALLING_ALL_ORDERS);
         setTelecallingOrders(ordersResponse.data);
         setFilteredOrders(ordersResponse.data);
-
-        // Fetch new products
-        const newProductsResponse = await api.get(API_ROUTES.TELECALLING_NEW_PRODUCTS);
-        setNewProducts(newProductsResponse.data);
 
         // Fetch telecallers with order count
         const telecallersResponse = await api.get(API_ROUTES.TELECALLERS_WITH_ORDERS);

@@ -17,9 +17,9 @@ import Login from "./components/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import DashboardLayout from "./components/DashboardLayout";
 import UserCreationPage from "./components/UserCreation";
-import Tellecalling from "./components/tellecalling";
+
 import TelecallingDashboard from "./components/TelecallingDashboard";
-import TelecallerRemarksOrders from "./components/TelecallerHistory";
+
 import UploadStatusPage from "./components/UploadStatusPage";
 import ProductUploadPage from "./components/ProductUpload";
 

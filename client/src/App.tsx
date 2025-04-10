@@ -100,14 +100,14 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               }
             />
-            <Route
+            {/* <Route
               path="telecaller-remarks-orders"
               element={
                 <ProtectedRoute allowedRoles={["tellecaller", "admin"]}>
                   <TelecallerRemarksOrders />
                 </ProtectedRoute>
               }
-            />
+            /> */}
             <Route
               path="upload"
               element={
@@ -132,14 +132,14 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               }
             />
-            <Route
+            {/* <Route
               path="tellecalling"
               element={
                 <ProtectedRoute allowedRoles={["tellecaller"]}>
                   <Tellecalling />
                 </ProtectedRoute>
               }
-            />
+            /> */}
             <Route
               path="telecalling-dashboard"
               element={

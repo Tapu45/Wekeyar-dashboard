@@ -46,7 +46,6 @@ const getProducts = async (req, res) => {
 exports.getProducts = getProducts;
 const saveTelecallingOrder = async (req, res) => {
     try {
-        console.log("Request body:", req.body);
         if (!req.user) {
             res.status(403).json({ error: "Unauthorized. User not found." });
             return;

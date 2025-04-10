@@ -590,20 +590,20 @@ export const getInactiveCustomers = async (req: Request, res: Response) => {
       take,
     });
 
-    // Fetch statuses from the TelecallingCustomer table
-    const telecallingStatuses = await prisma.telecallingCustomer.findMany({
+    // Fetch telecalling customers to get the lastCalledDate (updatedAt)
+    const telecallingCustomers = await prisma.telecallingCustomer.findMany({
       where: {
         customerId: { in: customers.map((customer) => customer.id) },
       },
       select: {
         customerId: true,
-        status: true,
+        updatedAt: true, // Use updatedAt as the lastCalledDate
       },
     });
 
-    // Create a map of statuses for quick lookup
-    const statusMap = new Map(
-      telecallingStatuses.map((entry) => [entry.customerId, entry.status])
+    // Create a map of lastCalledDate for quick lookup
+    const lastCalledDateMap = new Map(
+      telecallingCustomers.map((entry) => [entry.customerId, entry.updatedAt])
     );
 
     // Filter out customers whose last purchase date is after the `endDate`
@@ -626,7 +626,7 @@ export const getInactiveCustomers = async (req: Request, res: Response) => {
         storeName: customer.bills.length
           ? customer.bills[0].store?.storeName || null
           : null,
-        status: statusMap.get(customer.id) || "inactive", // Default to "inactive" if no status is found
+        lastCalledDate: lastCalledDateMap.get(customer.id)?.toISOString() || null, // Include lastCalledDate
       }));
 
     // Total count of inactive customers

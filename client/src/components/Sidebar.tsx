@@ -53,12 +53,12 @@ const Sidebar = ({
       icon: ClipboardList,
       roles: ["admin", "tellecaller"],
     },
-    {
-      title: "Order History",
-      path: "/telecaller-remarks-orders",
-      icon: ClipboardList,
-      roles: ["tellecaller"],
-    },
+    // {
+    //   title: "Order History",
+    //   path: "/telecaller-remarks-orders",
+    //   icon: ClipboardList,
+    //   roles: ["tellecaller"],
+    // },
     { title: "Customer Report", path: "/customer-report", icon: BarChart3, roles: ["admin", "tellecaller"] },
     { title: "Store Sales Report", path: "/store-sales-report", icon: Store, roles: ["admin", "tellecaller"] },
     { title: "Upload", path: "/upload", icon: UploadCloud, roles: ["admin"] },
@@ -70,7 +70,7 @@ const Sidebar = ({
       roles: ["admin"],
     },
     { title: "User Creation", path: "/user", icon: User, roles: ["admin"] },
-    { title: "Tellecalling", path: "/tellecalling", icon: User, roles: ["tellecaller"] },
+    // { title: "Tellecalling", path: "/tellecalling", icon: User, roles: ["tellecaller"] },
     { title: "Tellecaller", path: "/telecalling-dashboard", icon: Headset, roles: ["admin"] },
   ];
 

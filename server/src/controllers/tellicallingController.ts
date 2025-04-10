@@ -59,8 +59,6 @@ export const getProducts = async (req: Request, res: Response) => {
 
 export const saveTelecallingOrder = async (req: CustomRequest, res: Response): Promise<void> => {
   try {
-    console.log("Request body:", req.body);
-
     if (!req.user) {
       res.status(403).json({ error: "Unauthorized. User not found." });
       return;
@@ -412,7 +410,6 @@ export const getTelecallerRemarksOrders = async (req: CustomRequest, res: Respon
     res.status(500).json({ error: "Failed to fetch telecaller remarks/orders" });
   }
 };
-
 /**
  * Add a new telecalling customer
  */

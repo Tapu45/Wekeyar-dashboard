@@ -25,6 +25,7 @@ interface InactiveCustomer {
   lastPurchaseDate: string | null;
   storeName: string | null;
   status: string;
+  lastCalledDate: string | null;
 }
 
 interface InactiveCustomerListProps {
@@ -70,6 +71,7 @@ const fetchInactiveCustomers = async ({
         lastPurchaseDate: customer.lastPurchaseDate,
         storeName: customer.storeName,
         status: customer.status,
+        lastCalledDate: customer.lastCalledDate || null,
       })),
       totalCount: data.totalCount,
       hasMore: data.hasMore
@@ -382,6 +384,17 @@ const InactiveCustomerList: React.FC<InactiveCustomerListProps> = ({
                           </div>
                         </th>
                         <th
+      scope="col"
+      className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-blue-700"
+      onClick={() => handleSort("lastCalledDate")} // Add sorting for Last Called Date
+    >
+      <div className="flex items-center">
+        <FaCalendar className="mr-2 text-blue-200" />
+        Last Called
+        <FaSort className="ml-2 text-blue-200" />
+      </div>
+    </th>
+                        <th
                           scope="col"
                           className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
                         >
@@ -466,6 +479,21 @@ const InactiveCustomerList: React.FC<InactiveCustomerListProps> = ({
                                   </span>
                                 )}
                               </td>
+                              <td className="px-6 py-4 whitespace-nowrap cursor-pointer">
+            {customer.lastCalledDate ? (
+              <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                {new Date(customer.lastCalledDate).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </span>
+            ) : (
+              <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                Never
+              </span>
+            )}
+          </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <motion.button
                                   whileHover={{ scale: 1.05 }}

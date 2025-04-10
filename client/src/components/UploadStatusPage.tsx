@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api, { API_ROUTES } from "../utils/api";
 import { Calendar, Clock, Store, Filter, CheckCircle, XCircle, ArrowRight } from "lucide-react";
@@ -15,24 +15,37 @@ interface WeekData extends Array<UploadData | null> {}
 const UploadStatusPage: React.FC = () => {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
-  const [storeInput, setStoreInput] = useState<string>("");
   const [showResults, setShowResults] = useState<boolean>(false);
+  const [selectedStore, setSelectedStore] = useState<number | null>(null);
+  const [stores, setStores] = useState<{ id: number; storeName: string }[]>([]);
   
   // Query setup but disabled until explicitly triggered
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["uploadStatus", year, month, storeInput],
+    queryKey: ["uploadStatus", year, month, selectedStore],
     queryFn: async () => {
-      const isNumeric = !isNaN(Number(storeInput));
       const params = {
         year,
         month,
-        ...(isNumeric ? { storeId: Number(storeInput) } : { storeName: storeInput }),
+        storeId: selectedStore,
       };
       const response = await api.get(API_ROUTES.UPLOADSTATUS, { params });
       return response.data as UploadData[];
     },
     enabled: false, // Disable automatic fetching
   });
+
+  useEffect(() => {
+    const fetchStores = async () => {
+      try {
+        const { data } = await api.get(API_ROUTES.STORES);
+        setStores(data);
+      } catch (error) {
+        console.error("Failed to fetch stores:", error);
+      }
+    };
+  
+    fetchStores();
+  }, []);
 
   const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setYear(parseInt(e.target.value, 10));
@@ -44,13 +57,10 @@ const UploadStatusPage: React.FC = () => {
     setShowResults(false);
   };
 
-  const handleStoreInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setStoreInput(e.target.value);
-    setShowResults(false);
-  };
+ 
 
   const handleApply = () => {
-    if (year && month && storeInput.trim()) {
+    if (year && month && selectedStore) {
       refetch();
       setShowResults(true);
     }
@@ -180,35 +190,32 @@ const UploadStatusPage: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                    <Store className="w-4 h-4 mr-2 text-blue-500" />
-                    Store
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Enter store ID or name"
-                      value={storeInput}
-                      onChange={handleStoreInputChange}
-                      className="w-full p-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 pr-10"
-                    />
-                    {storeInput && (
-                      <button 
-                        onClick={() => setStoreInput("")}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <XCircle className="w-5 h-5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+    <Store className="w-4 h-4 mr-2 text-blue-500" />
+    Store
+  </label>
+  <select
+    value={selectedStore || ""}
+    onChange={(e) => setSelectedStore(Number(e.target.value))}
+    className="w-full p-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+  >
+    <option value="" disabled>
+       Select Store
+    </option>
+    {stores.map((store) => (
+      <option key={store.id} value={store.id}>
+        {store.storeName}
+      </option>
+    ))}
+  </select>
+</div>
               </div>
               
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleApply}
-                disabled={!year || !month || !storeInput.trim()}
+                disabled={!year || !month || !selectedStore}
                 className="w-full md:w-auto px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
                 <span>Apply Filters</span>

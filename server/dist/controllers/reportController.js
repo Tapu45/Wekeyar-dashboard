@@ -430,16 +430,16 @@ const getInactiveCustomers = async (req, res) => {
             skip,
             take,
         });
-        const telecallingStatuses = await exports.prisma.telecallingCustomer.findMany({
+        const telecallingCustomers = await exports.prisma.telecallingCustomer.findMany({
             where: {
                 customerId: { in: customers.map((customer) => customer.id) },
             },
             select: {
                 customerId: true,
-                status: true,
+                updatedAt: true,
             },
         });
-        const statusMap = new Map(telecallingStatuses.map((entry) => [entry.customerId, entry.status]));
+        const lastCalledDateMap = new Map(telecallingCustomers.map((entry) => [entry.customerId, entry.updatedAt]));
         const result = customers
             .filter((customer) => {
             const lastPurchaseDate = customer.bills.length
@@ -457,7 +457,7 @@ const getInactiveCustomers = async (req, res) => {
             storeName: customer.bills.length
                 ? customer.bills[0].store?.storeName || null
                 : null,
-            status: statusMap.get(customer.id) || "inactive",
+            lastCalledDate: lastCalledDateMap.get(customer.id)?.toISOString() || null,
         }));
         const totalCount = await exports.prisma.customer.count({
             where: {

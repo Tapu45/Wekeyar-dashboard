@@ -301,7 +301,12 @@ const getStoreWiseSalesReport = async (req, res) => {
                     },
                 },
             });
-            const totalNetAmount = sales.reduce((sum, bill) => sum + (bill.amountPaid - bill.creditAmount), 0);
+            const totalNetAmount = sales.reduce((sum, bill) => {
+                const billAmount = bill.amountPaid < 0
+                    ? bill.amountPaid + bill.creditAmount
+                    : bill.amountPaid - bill.creditAmount;
+                return sum + billAmount;
+            }, 0);
             const lastUploadDate = sales.length > 0
                 ? sales.reduce((latest, bill) => (bill.createdAt > latest ? bill.createdAt : latest), sales[0].createdAt)
                 : null;

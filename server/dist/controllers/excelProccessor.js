@@ -63,9 +63,14 @@ async function processExcelFile() {
             phone: '',
             email: ''
         };
-        let currentCustomer = null;
-        let currentBill = null;
         let lastValidDate = new Date();
+        let currentCustomer = {
+            phone: DEFAULT_PHONE,
+            name: DEFAULT_NAME,
+            date: lastValidDate,
+            isCashlist: true
+        };
+        let currentBill = null;
         let currentCustomerBills = [];
         let billRecords = [];
         let rowCount = 0;

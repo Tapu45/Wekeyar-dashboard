@@ -7,8 +7,8 @@ async function checkRemainingCustomers() {
     console.log('Checking remaining customers...');
 
     // Define the date range for November 2024
-    const startDate = new Date('2024-11-01T00:00:00.000Z');
-    const endDate = new Date('2024-11-30T23:59:59.999Z');
+    const startDate = new Date('2025-01-01T00:00:00.000Z');
+    const endDate = new Date('2025-01-31T23:59:59.999Z');
 
     // Step 1: Find all customers who had bills in November 2024
     const customersWithBillsInRange = await prisma.customer.findMany({

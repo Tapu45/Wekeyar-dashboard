@@ -5,8 +5,8 @@ const prisma = new client_1.PrismaClient();
 async function checkRemainingCustomers() {
     try {
         console.log('Checking remaining customers...');
-        const startDate = new Date('2024-11-01T00:00:00.000Z');
-        const endDate = new Date('2024-11-30T23:59:59.999Z');
+        const startDate = new Date('2025-01-01T00:00:00.000Z');
+        const endDate = new Date('2025-01-31T23:59:59.999Z');
         const customersWithBillsInRange = await prisma.customer.findMany({
             where: {
                 bills: {

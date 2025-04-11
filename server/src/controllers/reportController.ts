@@ -405,10 +405,13 @@ export const getStoreWiseSalesReport = async (
       });
 
       // Calculate total amount using the consistent logic
-      const totalNetAmount = sales.reduce(
-        (sum, bill) => sum + (bill.amountPaid - bill.creditAmount),
-        0
-      );
+      const totalNetAmount = sales.reduce((sum, bill) => {
+        const billAmount =
+          bill.amountPaid < 0
+            ? bill.amountPaid + bill.creditAmount // Add creditAmount for return bills
+            : bill.amountPaid - bill.creditAmount; // Subtract creditAmount for sales bills
+        return sum + billAmount;
+      }, 0);
 
       // Find the last upload date
       const lastUploadDate = sales.length > 0

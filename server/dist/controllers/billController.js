@@ -302,6 +302,7 @@ async function postDailyBills(req, res) {
         else if (failedBills.length > 0) {
             failedBills.map((bill) => {
                 console.log("Failed bill:", bill.error);
+                console.log("Failed bill:", bill.error.includes("already exists"));
             });
             if (failedBills.map((bill) => bill.error).includes("already exists")) {
                 console.log("Failed bills, done fixing:", bill);

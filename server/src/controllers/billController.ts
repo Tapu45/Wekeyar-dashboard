@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 
-export async function postDailyBills(req: Request, res: Response): Promise<void> {
+export async function postDailyBills(req: Request, res: Response): Promise<Response> {
   const prisma = new PrismaClient();
   const { bill } = req.body;
 
@@ -10,8 +10,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
     // validate body
     if (!bill) {
       console.log("Invalid request body", bill);
-      res.status(400).json({ error: "Invalid request body" });
-      return;
+      return res.status(400).json({ error: "Invalid request body" });
     }
 
     console.log("Processing bill input");
@@ -362,7 +361,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
         if (existingBill) {
           // Skip bills that already exist
           console.error(`Bill with number ${billData.billNo} already exists`);
-          res.status(200).json({success: true});
+          return res.status(200).json({success: true});
         }
         
         // Create the bill with nested bill details
@@ -409,7 +408,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
     
     // Return appropriate response based on success/failure
     if (processedBills.length > 0) {
-      res.status(200).json({ 
+      return res.status(200).json({ 
         success: true, 
         message: `${processedBills.length} bill(s) processed successfully${failedBills.length > 0 ? `, ${failedBills.length} failed` : ''}`,
         bills: processedBills,
@@ -422,26 +421,26 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
         })
         if(failedBills.map((bill) => bill.error).includes("already exists")){
             console.log("Failed bills, done fixing:", bill);
-            res.status(200).json(
+            return res.status(200).json(
                 {
                     success: true
                 }
             )
         }
-      res.status(400).json({ 
+        return res.status(400).json({ 
         success: false, 
         message: `All ${failedBills.length} bill(s) failed to process`,
         failedBills
       });
     } else {
-      res.status(400).json({ 
+        return res.status(400).json({ 
         success: false, 
         message: "No bills to process"
       });
     }
   } catch (error) {
     console.error("Error in postDailyBills:", error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       error: "Failed to process bills", 
       details: error instanceof Error ? error.message : "Unknown error"
     });

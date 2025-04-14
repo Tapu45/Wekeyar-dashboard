@@ -12,6 +12,7 @@ async function postDailyBills(req, res) {
             return;
         }
         console.log("Processing bill input");
+        console.log(bill);
         const billSegments = bill.split(/Apr \d+ \d+:\d+:\d+ PMCreating bill/);
         const billsToProcess = billSegments.length > 1
             ? billSegments.map((segment, index) => index === 0 ? segment : "Creating bill" + segment)

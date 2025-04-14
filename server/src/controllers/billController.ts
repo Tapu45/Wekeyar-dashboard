@@ -15,6 +15,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
     }
 
     console.log("Processing bill input");
+    console.log(bill); // Log the start of the bill for debugging
     
     // Split into individual bills if multiple exist
     // Look for "Creating bill" as a bill separator

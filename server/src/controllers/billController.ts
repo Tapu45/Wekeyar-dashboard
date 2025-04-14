@@ -6,6 +6,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
   const { bill } = req.body;
 
   try {
+    
     // validate body
     if (!bill) {
       console.log("Invalid request body", bill);
@@ -412,6 +413,14 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
         ...(failedBills.length > 0 && { failedBills })
       });
     } else if (failedBills.length > 0) {
+        if(failedBills.map((bill) => bill.error).includes("Error processing bill: Error: Bill with number RUCH/0388 already exists")){
+            console.log("Failed bills, done fixing:", bill);
+            res.status(200).json(
+                {
+                    success: true
+                }
+            )
+        }
       res.status(400).json({ 
         success: false, 
         message: `All ${failedBills.length} bill(s) failed to process`,

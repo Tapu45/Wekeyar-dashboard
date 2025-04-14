@@ -2,9 +2,11 @@
 const axios = require('axios');
 
 // Sample log data from your example
-const sampleBill = `Creating bill RUCH/0183
-07-04-2025
-001  TIME: 12:42
+const sampleBill = `Processing bill input
+CN09998
+14-04-2025
+001  TIME: 15:31
+9853022144
 CASH BILL
 RUCHIKA
 BHUBANESWAR
@@ -24,8 +26,7 @@ HAJMOLA REGULAR 160 JAR 30049011
 Rs. One Only
 1.00
 0.05
-1.00
-Our Software MARG Erp 9437026823,7978789800`;
+1.00`;
 
 // Test function
 async function testPostDailyBills() {

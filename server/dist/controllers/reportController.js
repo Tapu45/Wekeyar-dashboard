@@ -26,6 +26,7 @@ const getSummary = async (req, res) => {
                         ...(storeId ? { storeId: Number(storeId) } : {}),
                     },
                 },
+                ...(storeId ? { bills: { some: { storeId: Number(storeId) } } } : {}),
             },
             select: {
                 id: true,
@@ -403,7 +404,7 @@ const getAllCustomers = async (_req, res) => {
 exports.getAllCustomers = getAllCustomers;
 const getInactiveCustomers = async (req, res) => {
     try {
-        const { fromDate, toDate, page = 1, pageSize = 100 } = req.query;
+        const { fromDate, toDate, page = 1, pageSize = 100, storeId } = req.query;
         const today = new Date();
         const defaultFromDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         const defaultToDate = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
@@ -419,8 +420,10 @@ const getInactiveCustomers = async (req, res) => {
                             gte: startDate,
                             lte: endDate,
                         },
+                        ...(storeId ? { storeId: Number(storeId) } : {}),
                     },
                 },
+                ...(storeId ? { bills: { some: { storeId: Number(storeId) } } } : {}),
             },
             select: {
                 id: true,
@@ -472,8 +475,10 @@ const getInactiveCustomers = async (req, res) => {
                             gte: startDate,
                             lte: endDate,
                         },
+                        ...(storeId ? { storeId: Number(storeId) } : {}),
                     },
                 },
+                ...(storeId ? { bills: { some: { storeId: Number(storeId) } } } : {}),
             },
         });
         const hasMore = skip + take < totalCount;

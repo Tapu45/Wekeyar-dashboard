@@ -35,10 +35,20 @@ async function postDailyBills(req, res) {
                         billData.billNo = line.replace("Creating bill", "").trim();
                         break;
                     }
-                    else if (line && /\/\d+$/.test(line)) {
+                    else if (line.match(/^[A-Z]{2}\d+$/)) {
                         billData.billNo = line;
                         break;
                     }
+                    else if (line && /^[A-Z]+\/\d+$/.test(line)) {
+                        billData.billNo = line;
+                        break;
+                    }
+                }
+                if (billData.billNo && billData.billNo.startsWith("CN")) {
+                    billData.isReturnBill = true;
+                }
+                else {
+                    billData.isReturnBill = false;
                 }
                 const dateIndex = cleanedLines.findIndex((line) => line.match(/^\d{2}-\d{2}-\d{4}$/));
                 if (dateIndex !== -1) {
@@ -49,19 +59,37 @@ async function postDailyBills(req, res) {
                     billData.date = new Date();
                 }
                 const paymentIndex = cleanedLines.findIndex((line) => line.includes("BILL") && (line.includes("CASH") || line.includes("CREDIT")));
+                billData.customerName = null;
+                billData.customerPhone = null;
                 if (paymentIndex > 0) {
-                    const nameIndex = dateIndex !== -1 ? dateIndex + 1 : 0;
-                    if (nameIndex < paymentIndex &&
-                        !cleanedLines[nameIndex].match(/^\d{10}$/) &&
-                        !cleanedLines[nameIndex].startsWith("TIME:")) {
-                        billData.customerName = cleanedLines[nameIndex];
-                    }
                     for (let i = 0; i < paymentIndex; i++) {
                         if (cleanedLines[i].match(/^\d{10}$/)) {
                             billData.customerPhone = cleanedLines[i];
+                            if (i > 0 &&
+                                !cleanedLines[i - 1].match(/^\d{2}-\d{2}-\d{4}$/) &&
+                                !cleanedLines[i - 1].includes("TIME:")) {
+                                billData.customerName = cleanedLines[i - 1];
+                            }
                             break;
                         }
                     }
+                    if (!billData.customerPhone && dateIndex !== -1) {
+                        for (let i = dateIndex + 1; i < paymentIndex; i++) {
+                            const line = cleanedLines[i];
+                            if (!line.includes("TIME:") &&
+                                !line.match(/^\d+$/) &&
+                                !line.includes("BILL") &&
+                                !line.includes("/") &&
+                                line.length > 2) {
+                                billData.customerName = line;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (billData.customerName && paymentIndex !== -1 &&
+                    cleanedLines[paymentIndex + 1] === billData.customerName) {
+                    billData.customerName = null;
                 }
                 if (paymentIndex !== -1) {
                     billData.paymentType = cleanedLines[paymentIndex].toLowerCase().includes("cash") ? "cash" : "credit";
@@ -189,32 +217,63 @@ async function postDailyBills(req, res) {
                     throw new Error("Missing essential bill information (bill number or date)");
                 }
                 let customer;
-                if (billData.customerPhone) {
+                const hasCustomerName = billData.customerName && billData.customerName.trim() !== '';
+                const hasCustomerPhone = billData.customerPhone && billData.customerPhone.trim() !== '';
+                if (hasCustomerName && hasCustomerPhone) {
                     customer = await prisma.customer.upsert({
                         where: { phone: billData.customerPhone },
                         update: {
-                            name: billData.customerName || "Unknown Customer",
+                            name: billData.customerName,
                             ...(billData.customerAddress && { address: billData.customerAddress })
                         },
                         create: {
-                            name: billData.customerName || "Unknown Customer",
+                            name: billData.customerName,
                             phone: billData.customerPhone,
                             address: null,
                         }
                     });
                 }
-                else if (billData.customerName) {
-                    const uniquePhone = `NOPHONE-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-                    customer = await prisma.customer.create({
-                        data: {
+                else if (hasCustomerName && !hasCustomerPhone) {
+                    customer = await prisma.customer.upsert({
+                        where: { phone: "9999999999" },
+                        update: {
                             name: billData.customerName,
-                            phone: uniquePhone,
+                            ...(billData.customerAddress && { address: billData.customerAddress })
+                        },
+                        create: {
+                            name: billData.customerName,
+                            phone: "9999999999",
+                            address: null,
+                        }
+                    });
+                }
+                else if (!hasCustomerName && hasCustomerPhone) {
+                    customer = await prisma.customer.upsert({
+                        where: { phone: billData.customerPhone },
+                        update: {
+                            name: "Unknown Customer",
+                            ...(billData.customerAddress && { address: billData.customerAddress })
+                        },
+                        create: {
+                            name: "Unknown Customer",
+                            phone: billData.customerPhone,
                             address: null,
                         }
                     });
                 }
                 else {
-                    throw new Error("Missing customer information");
+                    customer = await prisma.customer.upsert({
+                        where: { phone: "9999999999" },
+                        update: {
+                            name: "Cashlist Customer",
+                            ...(billData.customerAddress && { address: billData.customerAddress })
+                        },
+                        create: {
+                            name: "Cashlist Customer",
+                            phone: "9999999999",
+                            address: null,
+                        }
+                    });
                 }
                 let store;
                 if (billData.storeName) {
@@ -264,7 +323,9 @@ async function postDailyBills(req, res) {
                         date: billData.date,
                         netDiscount: billData.netDiscount || 0,
                         netAmount: 0,
-                        amountPaid: billData.amountPaid || billData.calculatedAmount || 0,
+                        amountPaid: billData.isReturnBill ?
+                            -(billData.amountPaid || billData.calculatedAmount || 0) :
+                            (billData.amountPaid || billData.calculatedAmount || 0),
                         creditAmount: 0,
                         paymentType: billData.paymentType || "cash",
                         isUploaded: true,

@@ -31,6 +31,7 @@ interface InactiveCustomer {
 interface InactiveCustomerListProps {
   fromDate: string | null;
   toDate: string | null;
+  storeId: number | null;
 }
 
 interface PaginatedResponse<T> {
@@ -45,7 +46,7 @@ const fetchInactiveCustomers = async ({
 }: {
   queryKey: any;
 }): Promise<PaginatedResponse<InactiveCustomer>> => {
-  const [, fromDate, toDate, page, pageSize, searchTerm, sortField, sortDirection] = queryKey;
+  const [, fromDate, toDate, page, pageSize, searchTerm, sortField, sortDirection, storeId] = queryKey;
   
   try {
     const { data } = await api.get(API_ROUTES.INACTIVE_CUSTOMERS, {
@@ -56,7 +57,8 @@ const fetchInactiveCustomers = async ({
         pageSize,
         search: searchTerm || undefined,
         sortField: sortField || undefined,
-        sortDirection: sortDirection || undefined
+        sortDirection: sortDirection || undefined,
+        storeId: storeId || undefined
       },
     });
  // Add null checks for data and data.items
@@ -99,6 +101,7 @@ const fetchCustomerPurchaseHistory = async (customerId: number) => {
 const InactiveCustomerList: React.FC<InactiveCustomerListProps> = ({
   fromDate,
   toDate,
+  storeId,
 }) => {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(100);
@@ -117,7 +120,7 @@ const InactiveCustomerList: React.FC<InactiveCustomerListProps> = ({
       setDebouncedSearchTerm(searchTerm);
       // Reset to first page when search changes
       setPage(1);
-    }, 300);
+    }, 700);
     
     return () => clearTimeout(timer);
   }, [searchTerm]);
@@ -137,7 +140,8 @@ const InactiveCustomerList: React.FC<InactiveCustomerListProps> = ({
       pageSize, 
       debouncedSearchTerm,
       sortField,
-      sortDirection
+      sortDirection,
+      storeId,// Assuming storeId is not needed for this query
     ],
     queryFn: fetchInactiveCustomers,
     enabled: !!fromDate && !!toDate,

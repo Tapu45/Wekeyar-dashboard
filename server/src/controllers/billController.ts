@@ -51,10 +51,20 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           if (line.includes("Creating bill")) {
             billData.billNo = line.replace("Creating bill", "").trim();
             break;
-          } else if (line && /\/\d+$/.test(line)) {
+          } else if (line.match(/^[A-Z]{2}\d+$/)) {
+            // Match bill numbers like CN00007
+            billData.billNo = line;
+            break;
+          } else if (line && /^[A-Z]+\/\d+$/.test(line)) {
+            // Match bill numbers like RUCH/0393
             billData.billNo = line;
             break;
           }
+        }
+        if (billData.billNo && billData.billNo.startsWith("CN")) {
+          billData.isReturnBill = true;
+        } else {
+          billData.isReturnBill = false;
         }
         
         // Extract date - look for DD-MM-YYYY format
@@ -71,23 +81,50 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           line.includes("BILL") && (line.includes("CASH") || line.includes("CREDIT"))
         );
         
-        // Extract customer information - usually appears before the "CASH BILL" line
+        // Extract customer information - improved extraction to avoid misinterpretation
+        billData.customerName = null;
+        billData.customerPhone = null;
+
         if (paymentIndex > 0) {
-          // Look for customer name (usually right before TIME or after date)
-          const nameIndex = dateIndex !== -1 ? dateIndex + 1 : 0;
-          if (nameIndex < paymentIndex && 
-              !cleanedLines[nameIndex].match(/^\d{10}$/) && 
-              !cleanedLines[nameIndex].startsWith("TIME:")) {
-            billData.customerName = cleanedLines[nameIndex];
-          }
-          
-          // Look for 10-digit customer phone before the payment line
+          // First look for phone number (10 digits) before the payment line
           for (let i = 0; i < paymentIndex; i++) {
             if (cleanedLines[i].match(/^\d{10}$/)) {
               billData.customerPhone = cleanedLines[i];
+              
+              // If we find a phone, the name is typically the line before (if it's not a date or TIME line)
+              if (i > 0 && 
+                  !cleanedLines[i-1].match(/^\d{2}-\d{2}-\d{4}$/) && 
+                  !cleanedLines[i-1].includes("TIME:")) {
+                billData.customerName = cleanedLines[i-1];
+              }
               break;
             }
           }
+          
+          // If no phone found but there's a line that looks like a name after the date
+          // and before payment, use that as customer name
+          if (!billData.customerPhone && dateIndex !== -1) {
+            for (let i = dateIndex + 1; i < paymentIndex; i++) {
+              const line = cleanedLines[i];
+              // Skip lines that are clearly not names (TIME, numbers, store data)
+              if (!line.includes("TIME:") && 
+                  !line.match(/^\d+$/) && 
+                  !line.includes("BILL") &&
+                  !line.includes("/") && 
+                  line.length > 2) {
+                billData.customerName = line;
+                break;
+              }
+            }
+          }
+        }
+
+        // Double check that we didn't accidentally pick up store information as customer
+        // Store info usually comes after payment type line
+        if (billData.customerName && paymentIndex !== -1 && 
+            cleanedLines[paymentIndex + 1] === billData.customerName) {
+          // This is likely store name, not customer name
+          billData.customerName = null;
         }
         
         // Extract payment type
@@ -285,33 +322,71 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
         // Find or create customer - using upsert to avoid duplicates
         let customer;
         
-        if (billData.customerPhone) {
+        // Determine if we have valid customer information
+        const hasCustomerName = billData.customerName && billData.customerName.trim() !== '';
+        const hasCustomerPhone = billData.customerPhone && billData.customerPhone.trim() !== '';
+
+        // Handle all possible scenarios
+        if (hasCustomerName && hasCustomerPhone) {
+          // Case 1: Both name and phone provided
           customer = await prisma.customer.upsert({
             where: { phone: billData.customerPhone },
             update: {
-              name: billData.customerName || "Unknown Customer",
+              name: billData.customerName,
               // Only update address if provided
               ...(billData.customerAddress && { address: billData.customerAddress })
             },
             create: {
-              name: billData.customerName || "Unknown Customer",
+              name: billData.customerName,
               phone: billData.customerPhone,
               address: null,
             }
           });
-        } else if (billData.customerName) {
-          // Generate a unique phone ID for customers without phone
-          const uniquePhone = `NOPHONE-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-          customer = await prisma.customer.create({
-            data: {
+        } else if (hasCustomerName && !hasCustomerPhone) {
+          // Case 2: Name provided but phone not provided - use "9999999999"
+          customer = await prisma.customer.upsert({
+            where: { phone: "9999999999" },
+            update: {
               name: billData.customerName,
-              phone: uniquePhone,
+              // Only update address if provided
+              ...(billData.customerAddress && { address: billData.customerAddress })
+            },
+            create: {
+              name: billData.customerName,
+              phone: "9999999999",
+              address: null,
+            }
+          });
+        } else if (!hasCustomerName && hasCustomerPhone) {
+          // Case 3: Phone provided but name not provided - use "Unknown Customer"
+          customer = await prisma.customer.upsert({
+            where: { phone: billData.customerPhone },
+            update: {
+              name: "Unknown Customer",
+              // Only update address if provided
+              ...(billData.customerAddress && { address: billData.customerAddress })
+            },
+            create: {
+              name: "Unknown Customer",
+              phone: billData.customerPhone,
               address: null,
             }
           });
         } else {
-          // Skip bills without customer information
-          throw new Error("Missing customer information");
+          // Case 4: Both name and phone missing - use "Cashlist Customer" and "9999999999"
+          customer = await prisma.customer.upsert({
+            where: { phone: "9999999999" },
+            update: {
+              name: "Cashlist Customer",
+              // Only update address if provided
+              ...(billData.customerAddress && { address: billData.customerAddress })
+            },
+            create: {
+              name: "Cashlist Customer",
+              phone: "9999999999",
+              address: null,
+            }
+          });
         }
         
         // Find or create store - using upsert to avoid duplicates
@@ -373,7 +448,9 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
             date: billData.date,
             netDiscount: billData.netDiscount || 0,
             netAmount: 0, // Not using this field as per requirement
-            amountPaid: billData.amountPaid || billData.calculatedAmount || 0,
+            amountPaid: billData.isReturnBill ? 
+            -(billData.amountPaid || billData.calculatedAmount || 0) : 
+            (billData.amountPaid || billData.calculatedAmount || 0),
             creditAmount: 0,
             paymentType: billData.paymentType || "cash",
             isUploaded: true,

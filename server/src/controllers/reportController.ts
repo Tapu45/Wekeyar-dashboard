@@ -34,9 +34,10 @@ export const getSummary = async (req: Request, res: Response) => {
               gte: startDate,
               lte: endDate,
             },
-            ...(storeId ? { storeId: Number(storeId) } : {}),
+            ...(storeId ? { storeId: Number(storeId) } : {}), // Ensure storeId is considered
           },
         },
+        ...(storeId ? { bills: { some: { storeId: Number(storeId) } } } : {}), // Ensure storeId is considered
       },
       select: {
         id: true,
@@ -62,6 +63,8 @@ export const getSummary = async (req: Request, res: Response) => {
 
     // Calculate active customers by subtracting inactive customers from total customers
     const activeCustomerCount = totalCustomers - inactiveCustomerCount;
+
+    // Total bills count (filter by storeId if provided)
     const totalBills = await prisma.bill.count({
       where: {
         date: {
@@ -71,7 +74,8 @@ export const getSummary = async (req: Request, res: Response) => {
         ...(storeId ? { storeId: Number(storeId) } : {}),
       },
     });
-    
+
+    // Fetch bills to calculate total amount
     const bills = await prisma.bill.findMany({
       where: {
         date: {
@@ -553,7 +557,7 @@ export const getAllCustomers = async (
 
 export const getInactiveCustomers = async (req: Request, res: Response) => {
   try {
-    const { fromDate, toDate, page = 1, pageSize = 100 } = req.query;
+    const { fromDate, toDate, page = 1, pageSize = 100, storeId } = req.query;
 
     // Default date range: current month and previous month
     const today = new Date();
@@ -567,7 +571,7 @@ export const getInactiveCustomers = async (req: Request, res: Response) => {
     const skip = (Number(page) - 1) * Number(pageSize);
     const take = Number(pageSize);
 
-    // Fetch customers with no bills in the specified date range
+    // Fetch customers with no bills in the specified date range and store filter
     const customers = await prisma.customer.findMany({
       where: {
         bills: {
@@ -576,8 +580,10 @@ export const getInactiveCustomers = async (req: Request, res: Response) => {
               gte: startDate,
               lte: endDate,
             },
+            ...(storeId ? { storeId: Number(storeId) } : {}), // Apply store filter
           },
         },
+        ...(storeId ? { bills: { some: { storeId: Number(storeId) } } } : {}), // Ensure storeId is considered
       },
       select: {
         id: true,
@@ -641,8 +647,10 @@ export const getInactiveCustomers = async (req: Request, res: Response) => {
               gte: startDate,
               lte: endDate,
             },
+            ...(storeId ? { storeId: Number(storeId) } : {}), // Apply store filter
           },
         },
+        ...(storeId ? { bills: { some: { storeId: Number(storeId) } } } : {}), // Ensure storeId is considered
       },
     });
 

@@ -535,6 +535,7 @@ const SummaryReport: React.FC = () => {
             <InactiveCustomerList
               fromDate={appliedFilters.fromDate}
               toDate={appliedFilters.toDate}
+              storeId={appliedFilters.storeId}
             />
           </motion.div>
         )}

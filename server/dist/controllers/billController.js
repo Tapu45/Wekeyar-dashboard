@@ -254,7 +254,8 @@ async function postDailyBills(req, res) {
                     where: { billNo: billData.billNo }
                 });
                 if (existingBill) {
-                    throw new Error(`Bill with number ${billData.billNo} already exists`);
+                    console.error(`Bill with number ${billData.billNo} already exists`);
+                    res.status(200).json({ success: true });
                 }
                 const newBill = await prisma.bill.create({
                     data: {

@@ -360,7 +360,9 @@ export async function postDailyBills(req: Request, res: Response): Promise<void>
         });
         
         if (existingBill) {
-          throw new Error(`Bill with number ${billData.billNo} already exists`);
+          // Skip bills that already exist
+          console.error(`Bill with number ${billData.billNo} already exists`);
+          res.status(200).json({success: true});
         }
         
         // Create the bill with nested bill details

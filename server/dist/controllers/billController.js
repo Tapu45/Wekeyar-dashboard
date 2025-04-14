@@ -300,7 +300,10 @@ async function postDailyBills(req, res) {
             });
         }
         else if (failedBills.length > 0) {
-            if (failedBills.map((bill) => bill.error).includes("Error processing bill: Error: Bill with number RUCH/0388 already exists")) {
+            failedBills.map((bill) => {
+                console.log("Failed bill:", bill.error);
+            });
+            if (failedBills.map((bill) => bill.error).includes("already exists")) {
                 console.log("Failed bills, done fixing:", bill);
                 res.status(200).json({
                     success: true

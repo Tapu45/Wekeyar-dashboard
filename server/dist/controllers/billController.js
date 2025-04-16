@@ -213,8 +213,13 @@ async function postDailyBills(req, res) {
                     billData.items = medicineItems;
                 }
                 console.log("Extracted bill data:", JSON.stringify(billData, null, 2));
-                if (!billData.billNo || !billData.date) {
-                    throw new Error("Missing essential bill information (bill number or date)");
+                if (!billData.billNo || !billData.date || isNaN(billData.date.getTime())) {
+                    console.error("Invalid bill data:", billData);
+                    failedBills.push({
+                        error: "Missing essential bill information (bill number or date)",
+                        billText: billText.substring(0, 100) + "..."
+                    });
+                    continue;
                 }
                 let customer;
                 const hasCustomerName = billData.customerName && billData.customerName.trim() !== '';

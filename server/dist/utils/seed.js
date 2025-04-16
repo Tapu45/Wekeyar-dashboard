@@ -1,10 +1,10 @@
 "use strict";
 const axios = require('axios');
-const sampleBill = `Processing bill input
-CN09998
-14-04-2025
-001  TIME: 15:31
-9853022144
+const sampleBill = `RUCH/0789
+16-04-2025
+MANOJ KU GUPTA
+001  TIME: 11:43
+6294868602
 CASH BILL
 RUCHIKA
 BHUBANESWAR
@@ -12,19 +12,31 @@ BHUBANESWAR
 ODRET00532/R ODRET00533/RC
 21AACCW4774G1ZD
 1
-HAJMOLA REGULAR 160 JAR 30049011
-1138
-12/26
-1.00
-5.00
+OLESOFT MAX CREAM 150GM3004
+AD204
+9/25
+478.00
+20.00
 6.00
 6.00
-0.85
-1.00
-Rs. One Only
-1.00
-0.05
-1.00`;
+341.42
+478.00
+1:0
+APREZO-30MG-TAB
+3004
+400355
+2/27
+325.00
+20.00
+6.00
+6.00
+232.14
+325.00
+Rs. Six Hundred Forty Two Only
+803.00
+160.60
+642.00
+Our Software MARG Erp 9437026823,7978789800`;
 async function testPostDailyBills() {
     try {
         const response = await axios.post('http://localhost:4000/api/upload/daily/bill', {

@@ -65,15 +65,20 @@ async function postDailyBills(req, res) {
                     for (let i = 0; i < paymentIndex; i++) {
                         if (cleanedLines[i].match(/^\d{10}$/)) {
                             billData.customerPhone = cleanedLines[i];
-                            if (i > 0 &&
-                                !cleanedLines[i - 1].match(/^\d{2}-\d{2}-\d{4}$/) &&
-                                !cleanedLines[i - 1].includes("TIME:")) {
-                                billData.customerName = cleanedLines[i - 1];
+                            for (let j = i - 1; j >= 0; j--) {
+                                const line = cleanedLines[j];
+                                if (!line.match(/^\d{2}-\d{2}-\d{4}$/) &&
+                                    !line.includes("TIME:") &&
+                                    !line.match(/^\d+$/) &&
+                                    line.length > 2) {
+                                    billData.customerName = line;
+                                    break;
+                                }
                             }
                             break;
                         }
                     }
-                    if (!billData.customerPhone && dateIndex !== -1) {
+                    if (!billData.customerName && dateIndex !== -1) {
                         for (let i = dateIndex + 1; i < paymentIndex; i++) {
                             const line = cleanedLines[i];
                             if (!line.includes("TIME:") &&

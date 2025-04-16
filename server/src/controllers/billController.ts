@@ -91,11 +91,18 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
             if (cleanedLines[i].match(/^\d{10}$/)) {
               billData.customerPhone = cleanedLines[i];
               
-              // If we find a phone, the name is typically the line before (if it's not a date or TIME line)
-              if (i > 0 && 
-                  !cleanedLines[i-1].match(/^\d{2}-\d{2}-\d{4}$/) && 
-                  !cleanedLines[i-1].includes("TIME:")) {
-                billData.customerName = cleanedLines[i-1];
+              // Find the customer name - check lines before the phone number
+              // Start from one line before the phone and go backwards
+              for (let j = i - 1; j >= 0; j--) {
+                const line = cleanedLines[j];
+                // Skip lines with specific formats (date, time, etc.)
+                if (!line.match(/^\d{2}-\d{2}-\d{4}$/) && 
+                    !line.includes("TIME:") &&
+                    !line.match(/^\d+$/) &&
+                    line.length > 2) {
+                  billData.customerName = line;
+                  break;
+                }
               }
               break;
             }
@@ -103,10 +110,11 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           
           // If no phone found but there's a line that looks like a name after the date
           // and before payment, use that as customer name
-          if (!billData.customerPhone && dateIndex !== -1) {
+          if (!billData.customerName && dateIndex !== -1) {
+            // Look for lines after the date and before any TIME: line
             for (let i = dateIndex + 1; i < paymentIndex; i++) {
               const line = cleanedLines[i];
-              // Skip lines that are clearly not names (TIME, numbers, store data)
+              // Skip lines that are clearly not names
               if (!line.includes("TIME:") && 
                   !line.match(/^\d+$/) && 
                   !line.includes("BILL") &&

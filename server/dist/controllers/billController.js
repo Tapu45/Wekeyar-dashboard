@@ -262,18 +262,14 @@ async function postDailyBills(req, res) {
                     billData.items = medicineItems;
                 }
                 console.log("Extracted bill data:", JSON.stringify(billData, null, 2));
+                if (!billData.storeName) {
+                    billData.storeName = "Unknown Store";
+                    console.log("Store name missing, using default 'Unknown Store'");
+                }
                 if (!billData.billNo || !billData.date || isNaN(billData.date.getTime())) {
                     console.log("Invalid bill data: Missing essential bill information");
                     failedBills.push({
                         error: "Missing essential bill information (bill number or date)",
-                        billData
-                    });
-                    continue;
-                }
-                if (!billData.storeName) {
-                    console.log("Invalid bill data: Missing store information");
-                    failedBills.push({
-                        error: "Missing store information",
                         billData
                     });
                     continue;
@@ -353,7 +349,12 @@ async function postDailyBills(req, res) {
                     });
                 }
                 catch (error) {
-                    throw new Error(`Store creation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+                    console.log("Store creation error:", error instanceof Error ? error.message : "Unknown error");
+                    failedBills.push({
+                        error: `Store creation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+                        billData
+                    });
+                    continue;
                 }
                 const billDetails = billData.items.map((item) => {
                     return {

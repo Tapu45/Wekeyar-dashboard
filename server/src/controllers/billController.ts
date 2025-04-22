@@ -380,23 +380,21 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           billData.items = medicineItems;
         }
         
+        // DEBUG: Only log the extracted bill data once
         console.log("Extracted bill data:", JSON.stringify(billData, null, 2));
         
+        // FIX: Default store name if missing to avoid continuous validation errors
+        if (!billData.storeName) {
+          billData.storeName = "Unknown Store";
+          console.log("Store name missing, using default 'Unknown Store'");
+        }
+        
         // Enhanced validation - Skip bills with invalid data
+        // Log errors only once per bill
         if (!billData.billNo || !billData.date || isNaN(billData.date.getTime())) {
           console.log("Invalid bill data: Missing essential bill information");
           failedBills.push({
             error: "Missing essential bill information (bill number or date)",
-            billData
-          });
-          continue; // Skip to the next bill
-        }
-        
-        // Enhanced validation for store name
-        if (!billData.storeName) {
-          console.log("Invalid bill data: Missing store information");
-          failedBills.push({
-            error: "Missing store information",
             billData
           });
           continue; // Skip to the next bill
@@ -490,8 +488,12 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
             }
           });
         } catch (error) {
-          // If there's still an error with store creation, throw it
-          throw new Error(`Store creation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+          console.log("Store creation error:", error instanceof Error ? error.message : "Unknown error");
+          failedBills.push({
+            error: `Store creation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+            billData
+          });
+          continue; // Skip to next bill
         }
         
         // Prepare bill details
@@ -531,8 +533,8 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
             netDiscount: billData.netDiscount || 0,
             netAmount: 0, // Not using this field as per requirement
             amountPaid: billData.isReturnBill ? 
-            -(billData.amountPaid || billData.calculatedAmount || 0) : 
-            (billData.amountPaid || billData.calculatedAmount || 0),
+              -(billData.amountPaid || billData.calculatedAmount || 0) : 
+              (billData.amountPaid || billData.calculatedAmount || 0),
             creditAmount: 0,
             paymentType: billData.paymentType || "cash",
             isUploaded: true,

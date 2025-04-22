@@ -11,7 +11,6 @@ async function postDailyBills(req, res) {
             return res.status(400).json({ error: "Invalid request body" });
         }
         console.log("Processing bill input");
-        console.log(bill);
         const billSegments = bill.split(/Apr \d+ \d+:\d+:\d+ PMCreating bill/);
         const billsToProcess = billSegments.length > 1
             ? billSegments.map((segment, index) => index === 0 ? segment : "Creating bill" + segment)
@@ -29,6 +28,18 @@ async function postDailyBills(req, res) {
                 const cleanedLines = lines.map((line) => {
                     return line.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
                 }).filter((line) => line !== '');
+                const isNonBillFormat = cleanedLines.some((line) => line.includes("Weekly Sale Report") ||
+                    line.includes("SALE REPORT") ||
+                    line.includes("TOTAL NET SALE") ||
+                    (line.includes("SALE") && line.includes("RETURN") && line.includes("NET SALE")));
+                if (isNonBillFormat) {
+                    console.log("Detected non-bill format, skipping");
+                    failedBills.push({
+                        error: "Non-bill format detected",
+                        billText: billText.substring(0, 100) + "..."
+                    });
+                    continue;
+                }
                 for (let i = 0; i < cleanedLines.length; i++) {
                     const line = cleanedLines[i];
                     if (line.includes("Creating bill")) {
@@ -61,7 +72,7 @@ async function postDailyBills(req, res) {
                 const paymentIndex = cleanedLines.findIndex((line) => line.includes("BILL") && (line.includes("CASH") || line.includes("CREDIT")));
                 billData.customerName = null;
                 billData.customerPhone = null;
-                if (paymentIndex > 0) {
+                if (paymentIndex > 0 && paymentIndex < cleanedLines.length) {
                     for (let i = 0; i < paymentIndex; i++) {
                         if (cleanedLines[i].match(/^\d{10}$/)) {
                             billData.customerPhone = cleanedLines[i];
@@ -92,24 +103,57 @@ async function postDailyBills(req, res) {
                         }
                     }
                 }
-                if (billData.customerName && paymentIndex !== -1 &&
-                    cleanedLines[paymentIndex + 1] === billData.customerName) {
-                    billData.customerName = null;
+                billData.storeName = null;
+                billData.storeLocation = null;
+                billData.storePhone = null;
+                if (paymentIndex !== -1) {
+                    const potentialStoreLines = [];
+                    for (let i = paymentIndex + 1; i < cleanedLines.length; i++) {
+                        const line = cleanedLines[i];
+                        if (line && line.length > 2 && !line.match(/^\d+(\.\d{2})?$/)) {
+                            potentialStoreLines.push(line);
+                        }
+                        if (potentialStoreLines.length >= 4 || i > paymentIndex + 5)
+                            break;
+                    }
+                    if (potentialStoreLines.length > 0) {
+                        for (let i = 0; i < potentialStoreLines.length; i++) {
+                            const line = potentialStoreLines[i];
+                            const isDoctorName = line.match(/^DR\.?\s/i);
+                            if (!isDoctorName) {
+                                billData.storeName = line;
+                                if (i + 1 < potentialStoreLines.length) {
+                                    billData.storeLocation = potentialStoreLines[i + 1];
+                                    if (i + 2 < potentialStoreLines.length &&
+                                        potentialStoreLines[i + 2].match(/^\d{10}$/)) {
+                                        billData.storePhone = potentialStoreLines[i + 2];
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                        if (!billData.storeName) {
+                            for (let i = 0; i < potentialStoreLines.length - 1; i++) {
+                                const line = potentialStoreLines[i];
+                                const nextLine = potentialStoreLines[i + 1];
+                                const isDoctorName = line.match(/^DR\.?\s/i);
+                                if (isDoctorName && nextLine) {
+                                    billData.storeName = nextLine;
+                                    if (i + 2 < potentialStoreLines.length) {
+                                        billData.storeLocation = potentialStoreLines[i + 2];
+                                        if (i + 3 < potentialStoreLines.length &&
+                                            potentialStoreLines[i + 3].match(/^\d{10}$/)) {
+                                            billData.storePhone = potentialStoreLines[i + 3];
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
                 if (paymentIndex !== -1) {
                     billData.paymentType = cleanedLines[paymentIndex].toLowerCase().includes("cash") ? "cash" : "credit";
-                }
-                if (paymentIndex !== -1) {
-                    if (paymentIndex + 1 < cleanedLines.length) {
-                        billData.storeName = cleanedLines[paymentIndex + 1];
-                    }
-                    if (paymentIndex + 2 < cleanedLines.length) {
-                        billData.storeLocation = cleanedLines[paymentIndex + 2];
-                    }
-                    if (paymentIndex + 3 < cleanedLines.length &&
-                        cleanedLines[paymentIndex + 3].match(/^\d{10}$/)) {
-                        billData.storePhone = cleanedLines[paymentIndex + 3];
-                    }
                 }
                 const amountTextIndex = cleanedLines.findIndex((line) => line.startsWith("Rs.") && line.includes("Only"));
                 if (amountTextIndex !== -1) {
@@ -219,10 +263,18 @@ async function postDailyBills(req, res) {
                 }
                 console.log("Extracted bill data:", JSON.stringify(billData, null, 2));
                 if (!billData.billNo || !billData.date || isNaN(billData.date.getTime())) {
-                    console.error("Invalid bill data:", billData);
+                    console.log("Invalid bill data: Missing essential bill information");
                     failedBills.push({
                         error: "Missing essential bill information (bill number or date)",
-                        billText: billText.substring(0, 100) + "..."
+                        billData
+                    });
+                    continue;
+                }
+                if (!billData.storeName) {
+                    console.log("Invalid bill data: Missing store information");
+                    failedBills.push({
+                        error: "Missing store information",
+                        billData
                     });
                     continue;
                 }
@@ -286,27 +338,22 @@ async function postDailyBills(req, res) {
                     });
                 }
                 let store;
-                if (billData.storeName) {
-                    try {
-                        store = await prisma.store.upsert({
-                            where: { storeName: billData.storeName },
-                            update: {
-                                ...(billData.storeLocation && { address: billData.storeLocation }),
-                                ...(billData.storePhone && { phone: billData.storePhone })
-                            },
-                            create: {
-                                storeName: billData.storeName,
-                                address: billData.storeLocation || null,
-                                phone: billData.storePhone || null,
-                            }
-                        });
-                    }
-                    catch (error) {
-                        throw new Error(`Store creation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-                    }
+                try {
+                    store = await prisma.store.upsert({
+                        where: { storeName: billData.storeName },
+                        update: {
+                            ...(billData.storeLocation && { address: billData.storeLocation }),
+                            ...(billData.storePhone && { phone: billData.storePhone })
+                        },
+                        create: {
+                            storeName: billData.storeName,
+                            address: billData.storeLocation || null,
+                            phone: billData.storePhone || null,
+                        }
+                    });
                 }
-                else {
-                    throw new Error("Missing store information");
+                catch (error) {
+                    throw new Error(`Store creation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
                 }
                 const billDetails = billData.items.map((item) => {
                     return {
@@ -322,8 +369,12 @@ async function postDailyBills(req, res) {
                     where: { billNo: billData.billNo }
                 });
                 if (existingBill) {
-                    console.error(`Bill with number ${billData.billNo} already exists`);
-                    return res.status(200).json({ success: true });
+                    console.log(`Bill with number ${billData.billNo} already exists`);
+                    failedBills.push({
+                        error: "Bill already exists",
+                        billNo: billData.billNo
+                    });
+                    continue;
                 }
                 const newBill = await prisma.bill.create({
                     data: {
@@ -355,7 +406,7 @@ async function postDailyBills(req, res) {
                 });
             }
             catch (error) {
-                console.error("Error processing bill:", error);
+                console.log("Failed bill:", error instanceof Error ? error.message : "Unknown error");
                 failedBills.push({
                     error: error instanceof Error ? error.message : "Unknown error",
                     billText: billText.substring(0, 100) + "..."
@@ -372,14 +423,13 @@ async function postDailyBills(req, res) {
             });
         }
         else if (failedBills.length > 0) {
-            failedBills.map((bill) => {
-                console.log("Failed bill:", bill.error);
-                console.log("Failed bill:", bill.error.includes("already exists"));
-            });
-            if (failedBills.map((bill) => bill.error).includes("already exists")) {
-                console.log("Failed bills, done fixing:", bill);
+            const existingBillErrors = failedBills.filter(bill => bill.error === "Bill already exists" ||
+                (typeof bill.error === "string" && bill.error.includes("already exists")));
+            if (existingBillErrors.length > 0) {
+                console.log("Failed bills, done fixing:", existingBillErrors.length);
                 return res.status(200).json({
-                    success: true
+                    success: true,
+                    message: "Bills already exist in database"
                 });
             }
             return res.status(400).json({

@@ -6,6 +6,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
   const { bill } = req.body;
 
   try {
+    
     // validate body
     if (!bill) {
       console.log("Invalid request body", bill);
@@ -13,6 +14,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
     }
 
     console.log("Processing bill input");
+    console.log(bill); // Log the start of the bill for debugging
     
     // Split into individual bills if multiple exist
     // Look for "Creating bill" as a bill separator
@@ -42,25 +44,6 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           return line.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
         }).filter((line: string) => line !== '');
 
-        // Early validation to check if this is a weekly report or other non-bill format
-        // Check for indicators that this is not a regular bill
-        const isNonBillFormat = cleanedLines.some((line: string | string[]) => 
-          line.includes("Weekly Sale Report") || 
-          line.includes("SALE REPORT") ||
-          line.includes("TOTAL NET SALE") ||
-          (line.includes("SALE") && line.includes("RETURN") && line.includes("NET SALE"))
-        );
-
-        if (isNonBillFormat) {
-          // Skip processing non-bill formats
-          console.log("Detected non-bill format, skipping");
-          failedBills.push({
-            error: "Non-bill format detected",
-            billText: billText.substring(0, 100) + "..."
-          });
-          continue; // Skip to the next bill
-        }
-
         // Extract bill number
         for (let i = 0; i < cleanedLines.length; i++) {
           const line = cleanedLines[i];
@@ -78,7 +61,6 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
             break;
           }
         }
-        
         if (billData.billNo && billData.billNo.startsWith("CN")) {
           billData.isReturnBill = true;
         } else {
@@ -103,13 +85,14 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
         billData.customerName = null;
         billData.customerPhone = null;
 
-        if (paymentIndex > 0 && paymentIndex < cleanedLines.length) {
+        if (paymentIndex > 0) {
           // First look for phone number (10 digits) before the payment line
           for (let i = 0; i < paymentIndex; i++) {
             if (cleanedLines[i].match(/^\d{10}$/)) {
               billData.customerPhone = cleanedLines[i];
               
               // Find the customer name - check lines before the phone number
+              // Start from one line before the phone and go backwards
               for (let j = i - 1; j >= 0; j--) {
                 const line = cleanedLines[j];
                 // Skip lines with specific formats (date, time, etc.)
@@ -143,81 +126,37 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
             }
           }
         }
-        
-        // Extract store information - improved to handle doctor names correctly
-        billData.storeName = null;
-        billData.storeLocation = null;
-        billData.storePhone = null;
-        
-        if (paymentIndex !== -1) {
-          // Extract potential store information lines
-          const potentialStoreLines: string[] = [];
-          for (let i = paymentIndex + 1; i < cleanedLines.length; i++) {
-            const line = cleanedLines[i];
-            if (line && line.length > 2 && !line.match(/^\d+(\.\d{2})?$/)) {
-              potentialStoreLines.push(line);
-            }
-            
-            // Break after we've found store info or reached the limit of lines to check
-            if (potentialStoreLines.length >= 4 || i > paymentIndex + 5) break;
-          }
-          
-          // Process store information
-          if (potentialStoreLines.length > 0) {
-            // Find RUCHIKA or similar store names
-            for (let i = 0; i < potentialStoreLines.length; i++) {
-              const line = potentialStoreLines[i];
-              
-              // If a line starts with "DR." or similar, it's likely a doctor name, not a store name
-              const isDoctorName = line.match(/^DR\.?\s/i);
-              
-              if (!isDoctorName) {
-                billData.storeName = line;
-                
-                // If there's a line after this, check if it's a location
-                if (i + 1 < potentialStoreLines.length) {
-                  billData.storeLocation = potentialStoreLines[i + 1];
-                  
-                  // If there's another line after the location, check if it's a phone number
-                  if (i + 2 < potentialStoreLines.length && 
-                      potentialStoreLines[i + 2].match(/^\d{10}$/)) {
-                    billData.storePhone = potentialStoreLines[i + 2];
-                  }
-                }
-                break; // Found store info, stop processing
-              }
-            }
-            
-            // If still no store name but we found a doctor name followed by a store name
-            if (!billData.storeName) {
-              for (let i = 0; i < potentialStoreLines.length - 1; i++) {
-                const line = potentialStoreLines[i];
-                const nextLine = potentialStoreLines[i + 1];
-                
-                const isDoctorName = line.match(/^DR\.?\s/i);
-                if (isDoctorName && nextLine) {
-                  billData.storeName = nextLine; // The line after DR. is likely the store name
-                  
-                  // If there's a line after this, check if it's a location
-                  if (i + 2 < potentialStoreLines.length) {
-                    billData.storeLocation = potentialStoreLines[i + 2];
-                    
-                    // If there's another line after the location, check if it's a phone number
-                    if (i + 3 < potentialStoreLines.length && 
-                        potentialStoreLines[i + 3].match(/^\d{10}$/)) {
-                      billData.storePhone = potentialStoreLines[i + 3];
-                    }
-                  }
-                  break; // Found store info, stop processing
-                }
-              }
-            }
-          }
+
+        // Double check that we didn't accidentally pick up store information as customer
+        // Store info usually comes after payment type line
+        if (billData.customerName && paymentIndex !== -1 && 
+            cleanedLines[paymentIndex + 1] === billData.customerName) {
+          // This is likely store name, not customer name
+          billData.customerName = null;
         }
         
         // Extract payment type
         if (paymentIndex !== -1) {
           billData.paymentType = cleanedLines[paymentIndex].toLowerCase().includes("cash") ? "cash" : "credit";
+        }
+        
+        // Extract store information - appears after payment type
+        if (paymentIndex !== -1) {
+          // Store name is usually right after the payment line
+          if (paymentIndex + 1 < cleanedLines.length) {
+            billData.storeName = cleanedLines[paymentIndex + 1];
+          }
+          
+          // Store location is usually after store name
+          if (paymentIndex + 2 < cleanedLines.length) {
+            billData.storeLocation = cleanedLines[paymentIndex + 2];
+          }
+          
+          // Store phone is usually after location
+          if (paymentIndex + 3 < cleanedLines.length && 
+              cleanedLines[paymentIndex + 3].match(/^\d{10}$/)) {
+            billData.storePhone = cleanedLines[paymentIndex + 3];
+          }
         }
         
         // Find "Rs." amount text line
@@ -380,24 +319,15 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           billData.items = medicineItems;
         }
         
+        // Debug log the extracted bill data
         console.log("Extracted bill data:", JSON.stringify(billData, null, 2));
         
-        // Enhanced validation - Skip bills with invalid data
+        // Validation - Skip bills with invalid data
         if (!billData.billNo || !billData.date || isNaN(billData.date.getTime())) {
-          console.log("Invalid bill data: Missing essential bill information");
+          console.error("Invalid bill data:", billData);
           failedBills.push({
             error: "Missing essential bill information (bill number or date)",
-            billData
-          });
-          continue; // Skip to the next bill
-        }
-        
-        // Enhanced validation for store name
-        if (!billData.storeName) {
-          console.log("Invalid bill data: Missing store information");
-          failedBills.push({
-            error: "Missing store information",
-            billData
+            billText: billText.substring(0, 100) + "..."
           });
           continue; // Skip to the next bill
         }
@@ -475,23 +405,28 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
         // Find or create store - using upsert to avoid duplicates
         let store;
         
-        try {
-          store = await prisma.store.upsert({
-            where: { storeName: billData.storeName },
-            update: {
-              // Only update if new data is provided
-              ...(billData.storeLocation && { address: billData.storeLocation }),
-              ...(billData.storePhone && { phone: billData.storePhone })
-            },
-            create: {
-              storeName: billData.storeName,
-              address: billData.storeLocation || null,
-              phone: billData.storePhone || null,
-            }
-          });
-        } catch (error) {
-          // If there's still an error with store creation, throw it
-          throw new Error(`Store creation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+        if (billData.storeName) {
+          try {
+            store = await prisma.store.upsert({
+              where: { storeName: billData.storeName },
+              update: {
+                // Only update if new data is provided
+                ...(billData.storeLocation && { address: billData.storeLocation }),
+                ...(billData.storePhone && { phone: billData.storePhone })
+              },
+              create: {
+                storeName: billData.storeName,
+                address: billData.storeLocation || null,
+                phone: billData.storePhone || null,
+              }
+            });
+          } catch (error) {
+            // If there's still an error with store creation, throw it
+            throw new Error(`Store creation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+          }
+        } else {
+          // Skip bills without store information
+          throw new Error("Missing store information");
         }
         
         // Prepare bill details
@@ -513,12 +448,8 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
         
         if (existingBill) {
           // Skip bills that already exist
-          console.log(`Bill with number ${billData.billNo} already exists`);
-          failedBills.push({
-            error: "Bill already exists",
-            billNo: billData.billNo
-          });
-          continue; // Skip to next bill
+          console.error(`Bill with number ${billData.billNo} already exists`);
+          return res.status(200).json({success: true});
         }
         
         // Create the bill with nested bill details
@@ -554,7 +485,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
         
       } catch (error) {
         // Log the error and add to failed bills
-        console.log("Failed bill:", error instanceof Error ? error.message : "Unknown error");
+        console.error("Error processing bill:", error);
         failedBills.push({
           error: error instanceof Error ? error.message : "Unknown error",
           billText: billText.substring(0, 100) + "..." // Include part of the bill text for debugging
@@ -574,27 +505,25 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
         ...(failedBills.length > 0 && { failedBills })
       });
     } else if (failedBills.length > 0) {
-      // Check if any failed due to already existing bills
-      const existingBillErrors = failedBills.filter(bill => 
-        bill.error === "Bill already exists" || 
-        (typeof bill.error === "string" && bill.error.includes("already exists"))
-      );
-      
-      if (existingBillErrors.length > 0) {
-        console.log("Failed bills, done fixing:", existingBillErrors.length);
-        return res.status(200).json({
-          success: true,
-          message: "Bills already exist in database"
-        });
-      }
-      
-      return res.status(400).json({ 
+        failedBills.map((bill) => {
+            console.log("Failed bill:", bill.error);
+            console.log("Failed bill:", bill.error.includes("already exists"));
+        })
+        if(failedBills.map((bill) => bill.error).includes("already exists")){
+            console.log("Failed bills, done fixing:", bill);
+            return res.status(200).json(
+                {
+                    success: true
+                }
+            )
+        }
+        return res.status(400).json({ 
         success: false, 
         message: `All ${failedBills.length} bill(s) failed to process`,
         failedBills
       });
     } else {
-      return res.status(400).json({ 
+        return res.status(400).json({ 
         success: false, 
         message: "No bills to process"
       });

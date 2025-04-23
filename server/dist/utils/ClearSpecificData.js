@@ -2,43 +2,85 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
-async function deleteCustomersWithNoBills() {
+async function clearSpecificData() {
     try {
-        console.log('Starting to delete customers with no bills...');
-        const customersWithNoBills = await prisma.customer.findMany({
+        console.log('Starting to clear specific data...');
+        const startDate = new Date('2025-04-23T00:00:00.000Z');
+        const endDate = new Date('2025-04-23T23:59:59.999Z');
+        const billsToDelete = await prisma.bill.findMany({
             where: {
-                bills: {
-                    none: {},
+                date: {
+                    gte: startDate,
+                    lte: endDate,
                 },
             },
             select: {
                 id: true,
-                name: true,
-                phone: true,
+                customerId: true,
             },
         });
-        console.log(`Found ${customersWithNoBills.length} customers with no bills to delete.`);
-        if (customersWithNoBills.length > 0) {
-            const customerIdsToDelete = customersWithNoBills.map((customer) => customer.id);
-            await prisma.customer.deleteMany({
+        const billIdsToDelete = billsToDelete.map((bill) => bill.id);
+        const customerIdsToCheck = [...new Set(billsToDelete.map((bill) => bill.customerId))];
+        console.log(`Found ${billIdsToDelete.length} bills to delete.`);
+        console.log('Deleting related BillDetails...');
+        await prisma.billDetails.deleteMany({
+            where: {
+                billId: {
+                    in: billIdsToDelete,
+                },
+            },
+        });
+        console.log('Deleted related BillDetails.');
+        console.log('Deleting bills...');
+        await prisma.bill.deleteMany({
+            where: {
+                id: {
+                    in: billIdsToDelete,
+                },
+            },
+        });
+        console.log('Deleted bills.');
+        console.log('Checking customers who only have bills in the specified date range...');
+        const customersToDelete = [];
+        for (const customerId of customerIdsToCheck) {
+            const otherBills = await prisma.bill.findMany({
                 where: {
-                    id: {
-                        in: customerIdsToDelete,
+                    customerId,
+                    date: {
+                        not: {
+                            gte: startDate,
+                            lte: endDate,
+                        },
                     },
                 },
             });
-            console.log('Deleted customers with no bills successfully.');
+            if (otherBills.length === 0) {
+                customersToDelete.push(customerId);
+            }
+        }
+        console.log(`Found ${customersToDelete.length} customers to delete.`);
+        if (customersToDelete.length > 0) {
+            console.log('Deleting customers...');
+            await prisma.customer.deleteMany({
+                where: {
+                    id: {
+                        in: customersToDelete,
+                    },
+                },
+            });
+            console.log('Deleted customers.');
         }
         else {
-            console.log('No customers with no bills found to delete.');
+            console.log('No customers to delete.');
         }
+        console.log('Specific data cleared successfully.');
     }
     catch (error) {
-        console.error('Error deleting customers with no bills:', error);
+        console.error('Error clearing specific data:', error);
     }
     finally {
         await prisma.$disconnect();
     }
 }
-deleteCustomersWithNoBills();
+clearSpecificData();
 //# sourceMappingURL=ClearSpecificData.js.map

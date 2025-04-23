@@ -1,12 +1,13 @@
 "use strict";
 const axios = require('axios');
 const sampleBill = `Processing bill input
-RUCH/0678
+RUCH/0007
 15-04-2025
 ASHISH KU MOHANTY
 001  TIME: 18:03
 8658992282
 CASH BILL
+ASHISH KU MOHANTY
 RUCHIKA
 BHUBANESWAR
 7205959341

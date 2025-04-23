@@ -18,6 +18,19 @@ async function postDailyBills(req, res) {
             : [bill];
         const processedBills = [];
         const failedBills = [];
+        const knownStores = [
+            "RUCHIKA",
+            "WEKEYAR PLUS",
+            "MAUSIMAA SQUARE",
+            "DUMDUMA",
+            "SUM HOSPITAL",
+            "SAMANTARAPUR",
+            "GGP COLONY",
+            "CHANDRASEKHARPUR",
+            "KALINGA VIHAR",
+            "VSS NAGAR",
+            "IRC VILLAGE"
+        ];
         for (const billText of billsToProcess) {
             if (!billText.trim())
                 continue;
@@ -100,15 +113,34 @@ async function postDailyBills(req, res) {
                     billData.paymentType = cleanedLines[paymentIndex].toLowerCase().includes("cash") ? "cash" : "credit";
                 }
                 if (paymentIndex !== -1) {
-                    if (paymentIndex + 1 < cleanedLines.length) {
-                        billData.storeName = cleanedLines[paymentIndex + 1];
+                    let foundKnownStore = false;
+                    for (let i = paymentIndex + 1; i < Math.min(paymentIndex + 5, cleanedLines.length); i++) {
+                        const line = cleanedLines[i];
+                        const matchedStore = knownStores.find(store => line.toUpperCase() === store.toUpperCase());
+                        if (matchedStore) {
+                            billData.storeName = matchedStore;
+                            foundKnownStore = true;
+                            if (i + 1 < cleanedLines.length) {
+                                billData.storeLocation = cleanedLines[i + 1];
+                            }
+                            if (i + 2 < cleanedLines.length &&
+                                cleanedLines[i + 2].match(/^\d{10}$/)) {
+                                billData.storePhone = cleanedLines[i + 2];
+                            }
+                            break;
+                        }
                     }
-                    if (paymentIndex + 2 < cleanedLines.length) {
-                        billData.storeLocation = cleanedLines[paymentIndex + 2];
-                    }
-                    if (paymentIndex + 3 < cleanedLines.length &&
-                        cleanedLines[paymentIndex + 3].match(/^\d{10}$/)) {
-                        billData.storePhone = cleanedLines[paymentIndex + 3];
+                    if (!foundKnownStore) {
+                        if (paymentIndex + 1 < cleanedLines.length) {
+                            billData.storeName = cleanedLines[paymentIndex + 1];
+                        }
+                        if (paymentIndex + 2 < cleanedLines.length) {
+                            billData.storeLocation = cleanedLines[paymentIndex + 2];
+                        }
+                        if (paymentIndex + 3 < cleanedLines.length &&
+                            cleanedLines[paymentIndex + 3].match(/^\d{10}$/)) {
+                            billData.storePhone = cleanedLines[paymentIndex + 3];
+                        }
                     }
                 }
                 const amountTextIndex = cleanedLines.findIndex((line) => line.startsWith("Rs.") && line.includes("Only"));

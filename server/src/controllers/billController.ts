@@ -29,6 +29,21 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
     const processedBills = [];
     const failedBills = [];
     
+    // List of known store names for validation
+    const knownStores = [
+      "RUCHIKA",
+      "WEKEYAR PLUS",
+      "MAUSIMAA SQUARE",
+      "DUMDUMA",
+      "SUM HOSPITAL",
+      "SAMANTARAPUR",
+      "GGP COLONY",
+      "CHANDRASEKHARPUR",
+      "KALINGA VIHAR",
+      "VSS NAGAR",
+      "IRC VILLAGE"
+    ];
+    
     for (const billText of billsToProcess) {
       if (!billText.trim()) continue;
       
@@ -141,21 +156,55 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
         }
         
         // Extract store information - appears after payment type
+        // MODIFIED: Improved store name extraction to recognize known stores
         if (paymentIndex !== -1) {
-          // Store name is usually right after the payment line
-          if (paymentIndex + 1 < cleanedLines.length) {
-            billData.storeName = cleanedLines[paymentIndex + 1];
+          let foundKnownStore = false;
+          
+          // Check for known store names after the payment line
+          for (let i = paymentIndex + 1; i < Math.min(paymentIndex + 5, cleanedLines.length); i++) {
+            const line = cleanedLines[i];
+            
+            // Check if this line matches any known store name
+            const matchedStore = knownStores.find(store => 
+              line.toUpperCase() === store.toUpperCase()
+            );
+            
+            if (matchedStore) {
+              billData.storeName = matchedStore;
+              foundKnownStore = true;
+              
+              // Store location is usually after store name
+              if (i + 1 < cleanedLines.length) {
+                billData.storeLocation = cleanedLines[i + 1];
+              }
+              
+              // Store phone is usually after location
+              if (i + 2 < cleanedLines.length && 
+                  cleanedLines[i + 2].match(/^\d{10}$/)) {
+                billData.storePhone = cleanedLines[i + 2];
+              }
+              
+              break;
+            }
           }
           
-          // Store location is usually after store name
-          if (paymentIndex + 2 < cleanedLines.length) {
-            billData.storeLocation = cleanedLines[paymentIndex + 2];
-          }
-          
-          // Store phone is usually after location
-          if (paymentIndex + 3 < cleanedLines.length && 
-              cleanedLines[paymentIndex + 3].match(/^\d{10}$/)) {
-            billData.storePhone = cleanedLines[paymentIndex + 3];
+          // If no known store was found, fall back to the original logic
+          if (!foundKnownStore) {
+            // Store name is usually right after the payment line
+            if (paymentIndex + 1 < cleanedLines.length) {
+              billData.storeName = cleanedLines[paymentIndex + 1];
+            }
+            
+            // Store location is usually after store name
+            if (paymentIndex + 2 < cleanedLines.length) {
+              billData.storeLocation = cleanedLines[paymentIndex + 2];
+            }
+            
+            // Store phone is usually after location
+            if (paymentIndex + 3 < cleanedLines.length && 
+                cleanedLines[paymentIndex + 3].match(/^\d{10}$/)) {
+              billData.storePhone = cleanedLines[paymentIndex + 3];
+            }
           }
         }
         

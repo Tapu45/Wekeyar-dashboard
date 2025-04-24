@@ -15,16 +15,6 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
 
     console.log("Processing bill input");
     console.log(bill); // Log the start of the bill for debugging
-
-    if (bill.includes("Weekly Sale Report") || 
-    (bill.includes("TOTAL NET SALE") && bill.includes("TOTAL COLLECTION")) || 
-    (bill.includes("SALE") && bill.includes("RETURN") && bill.includes("NET SALE") && bill.includes("COLLECTION"))) {
-  console.log("Detected a summary report instead of a bill - skipping processing");
-  return res.status(200).json({ 
-    success: false, 
-    message: "Input appears to be a summary report rather than individual bills" 
-  });
-}
     
     // Split into individual bills if multiple exist
     // Look for "Creating bill" as a bill separator
@@ -159,6 +149,12 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           // This is likely store name, not customer name
           billData.customerName = null;
         }
+
+        if (billData.customerName && 
+          (billData.customerName.match(/^[A-Z]+\/\d+$/) || // Format like RUCH/0393
+           billData.customerName.match(/^[A-Z]{2}\d+$/))) { // Format like CN00007
+        billData.customerName = null;
+      }
         
         // Extract payment type
         if (paymentIndex !== -1) {

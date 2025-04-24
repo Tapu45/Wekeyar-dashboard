@@ -12,15 +12,6 @@ async function postDailyBills(req, res) {
         }
         console.log("Processing bill input");
         console.log(bill);
-        if (bill.includes("Weekly Sale Report") ||
-            (bill.includes("TOTAL NET SALE") && bill.includes("TOTAL COLLECTION")) ||
-            (bill.includes("SALE") && bill.includes("RETURN") && bill.includes("NET SALE") && bill.includes("COLLECTION"))) {
-            console.log("Detected a summary report instead of a bill - skipping processing");
-            return res.status(200).json({
-                success: false,
-                message: "Input appears to be a summary report rather than individual bills"
-            });
-        }
         const billSegments = bill.split(/Apr \d+ \d+:\d+:\d+ PMCreating bill/);
         const billsToProcess = billSegments.length > 1
             ? billSegments.map((segment, index) => index === 0 ? segment : "Creating bill" + segment)
@@ -116,6 +107,11 @@ async function postDailyBills(req, res) {
                 }
                 if (billData.customerName && paymentIndex !== -1 &&
                     cleanedLines[paymentIndex + 1] === billData.customerName) {
+                    billData.customerName = null;
+                }
+                if (billData.customerName &&
+                    (billData.customerName.match(/^[A-Z]+\/\d+$/) ||
+                        billData.customerName.match(/^[A-Z]{2}\d+$/))) {
                     billData.customerName = null;
                 }
                 if (paymentIndex !== -1) {

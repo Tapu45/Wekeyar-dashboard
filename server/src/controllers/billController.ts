@@ -15,6 +15,16 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
 
     console.log("Processing bill input");
     console.log(bill); // Log the start of the bill for debugging
+
+    if (bill.includes("Weekly Sale Report") || 
+    (bill.includes("TOTAL NET SALE") && bill.includes("TOTAL COLLECTION")) || 
+    (bill.includes("SALE") && bill.includes("RETURN") && bill.includes("NET SALE") && bill.includes("COLLECTION"))) {
+  console.log("Detected a summary report instead of a bill - skipping processing");
+  return res.status(200).json({ 
+    success: false, 
+    message: "Input appears to be a summary report rather than individual bills" 
+  });
+}
     
     // Split into individual bills if multiple exist
     // Look for "Creating bill" as a bill separator
@@ -380,18 +390,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           });
           continue; // Skip to the next bill
         }
-        const filteredLines = cleanedLines.filter((line: string) => {
-          return !["SALE", "RETURN", "NET SALE", "CASH DEPOSIT", "CARD", "UPI", "AMOUNT"].includes(line.trim().toUpperCase());
-        });
         
-        if (filteredLines.length === 0) {
-          console.error("No valid lines found in bill text:", billText);
-          failedBills.push({
-            error: "No valid lines found in bill text",
-            billText: billText.substring(0, 100) + "..."
-          });
-          continue; // Skip to the next bill
-        }
         // Find or create customer - using upsert to avoid duplicates
         let customer;
         

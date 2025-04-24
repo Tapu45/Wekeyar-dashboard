@@ -12,6 +12,15 @@ async function postDailyBills(req, res) {
         }
         console.log("Processing bill input");
         console.log(bill);
+        if (bill.includes("Weekly Sale Report") ||
+            (bill.includes("TOTAL NET SALE") && bill.includes("TOTAL COLLECTION")) ||
+            (bill.includes("SALE") && bill.includes("RETURN") && bill.includes("NET SALE") && bill.includes("COLLECTION"))) {
+            console.log("Detected a summary report instead of a bill - skipping processing");
+            return res.status(200).json({
+                success: false,
+                message: "Input appears to be a summary report rather than individual bills"
+            });
+        }
         const billSegments = bill.split(/Apr \d+ \d+:\d+:\d+ PMCreating bill/);
         const billsToProcess = billSegments.length > 1
             ? billSegments.map((segment, index) => index === 0 ? segment : "Creating bill" + segment)
@@ -254,17 +263,6 @@ async function postDailyBills(req, res) {
                     console.error("Invalid bill data:", billData);
                     failedBills.push({
                         error: "Missing essential bill information (bill number or date)",
-                        billText: billText.substring(0, 100) + "..."
-                    });
-                    continue;
-                }
-                const filteredLines = cleanedLines.filter((line) => {
-                    return !["SALE", "RETURN", "NET SALE", "CASH DEPOSIT", "CARD", "UPI", "AMOUNT"].includes(line.trim().toUpperCase());
-                });
-                if (filteredLines.length === 0) {
-                    console.error("No valid lines found in bill text:", billText);
-                    failedBills.push({
-                        error: "No valid lines found in bill text",
                         billText: billText.substring(0, 100) + "..."
                     });
                     continue;

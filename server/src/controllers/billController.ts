@@ -380,7 +380,18 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           });
           continue; // Skip to the next bill
         }
+        const filteredLines = cleanedLines.filter((line: string) => {
+          return !["SALE", "RETURN", "NET SALE", "CASH DEPOSIT", "CARD", "UPI", "AMOUNT"].includes(line.trim().toUpperCase());
+        });
         
+        if (filteredLines.length === 0) {
+          console.error("No valid lines found in bill text:", billText);
+          failedBills.push({
+            error: "No valid lines found in bill text",
+            billText: billText.substring(0, 100) + "..."
+          });
+          continue; // Skip to the next bill
+        }
         // Find or create customer - using upsert to avoid duplicates
         let customer;
         

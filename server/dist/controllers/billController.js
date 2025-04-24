@@ -258,6 +258,17 @@ async function postDailyBills(req, res) {
                     });
                     continue;
                 }
+                const filteredLines = cleanedLines.filter((line) => {
+                    return !["SALE", "RETURN", "NET SALE", "CASH DEPOSIT", "CARD", "UPI", "AMOUNT"].includes(line.trim().toUpperCase());
+                });
+                if (filteredLines.length === 0) {
+                    console.error("No valid lines found in bill text:", billText);
+                    failedBills.push({
+                        error: "No valid lines found in bill text",
+                        billText: billText.substring(0, 100) + "..."
+                    });
+                    continue;
+                }
                 let customer;
                 const hasCustomerName = billData.customerName && billData.customerName.trim() !== '';
                 const hasCustomerPhone = billData.customerPhone && billData.customerPhone.trim() !== '';

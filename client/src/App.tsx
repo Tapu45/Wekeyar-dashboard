@@ -23,8 +23,9 @@ import UploadStatusPage from "./components/UploadStatusPage";
 import ProductUploadPage from "./components/ProductUpload";
 import UploadManager from "./components/upload";
 import CustomerAnalysisManager from "./components/Customer";
+import TelecallingCustomerManager from "./components/ManageCu";
 
-import TelecallingCustomersPage from "./components/ManageCu";
+
 
 const queryClient = new QueryClient();
 
@@ -71,14 +72,14 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               }
             />
-            <Route
+            {/* <Route
               path="non-buying-monthly-customers"
               element={
                 <ProtectedRoute allowedRoles={["admin", "tellecaller"]}>
                   <NonBuyingMonthlyCustomer />
                 </ProtectedRoute>
               }
-            />
+            /> */}
             <Route
               path="customer-report"
               element={
@@ -140,7 +141,7 @@ const App: React.FC = () => {
               path="Add-new-customer"
               element={
                 <ProtectedRoute allowedRoles={["admin", "tellecaller"]}>
-                  <TelecallingCustomersPage />
+                  <TelecallingCustomerManager />
                 </ProtectedRoute>
               }
             />

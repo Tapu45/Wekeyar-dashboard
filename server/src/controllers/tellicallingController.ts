@@ -132,9 +132,6 @@ export const saveTelecallingOrder = async (req: CustomRequest, res: Response): P
 /**
  * Fetch all telecalling orders
  */
-/**
- * Fetch all telecalling orders
- */
 export const getTelecallingOrders = async (_req: Request, res: Response) => {
   try {
     const orders = await prisma.telecallingOrder.findMany({
@@ -410,36 +407,51 @@ export const getTelecallerRemarksOrders = async (req: CustomRequest, res: Respon
     res.status(500).json({ error: "Failed to fetch telecaller remarks/orders" });
   }
 };
+
 /**
  * Add a new telecalling customer
  */
 export const addNewTelecallingCustomer = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { storeName, customerName, customerPhone } = req.body;
+    const { storeName, customerName, customerPhone, address } = req.body;
 
     // Validate input
     if (!storeName || !customerName || !customerPhone) {
-     res.status(400).json({ error: "Store name, customer name, and phone number are required." });
+      res.status(400).json({ error: "Store name, customer name, and phone number are required." });
       return;
     }
 
-    // Check if the customer already exists
+    // Check if the customer already exists in the new customer table
+    const existingNewCustomer = await prisma.telecallingNewCustomer.findFirst({
+      where: { customerPhone },
+    });
+
+    if (existingNewCustomer) {
+      res.status(400).json({ error: "Customer with this phone number already exists in the new customers list." });
+      return;
+    }
+
+    // Also check in the main TelecallingCustomer table
     const existingCustomer = await prisma.telecallingCustomer.findFirst({
       where: { customerPhone },
     });
 
     if (existingCustomer) {
-     res.status(400).json({ error: "Customer with this phone number already exists." });
+      res.status(400).json({ error: "Customer with this phone number already exists in the main customers list." });
       return;
     }
 
-    // Create a new customer
-    const newCustomer = await prisma.telecallingCustomer.create({
+    // Generate a unique customer ID
+    const customerId = parseInt(uuidv4().replace(/-/g, "").slice(0, 4), 16);
+
+    // Create a new customer in the TelecallingNewCustomer table
+    const newCustomer = await prisma.telecallingNewCustomer.create({
       data: {
-        customerId: parseInt(uuidv4().replace(/-/g, "").slice(0, 4), 16), // Generate a unique 10-digit number
+        customerId,
         storeName,
         customerName,
         customerPhone,
+        address: address || null,
       },
     });
 
@@ -447,6 +459,21 @@ export const addNewTelecallingCustomer = async (req: Request, res: Response): Pr
   } catch (error) {
     console.error("Error adding new telecalling customer:", error);
     res.status(500).json({ error: "Failed to add new telecalling customer." });
+  }
+};
+
+export const getNewTelecallingCustomers = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const newCustomers = await prisma.telecallingNewCustomer.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+    
+    res.status(200).json(newCustomers);
+  } catch (error) {
+    console.error("Error fetching new telecalling customers:", error);
+    res.status(500).json({ error: "Failed to fetch new telecalling customers." });
   }
 };
 

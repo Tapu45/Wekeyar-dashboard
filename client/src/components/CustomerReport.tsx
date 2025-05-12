@@ -18,7 +18,7 @@ import {
   Pill, 
   Package
 } from "lucide-react";
-import {  exportDetailedToExcel, exportDetailedToPDF, exportNormalToExcel, exportNormalToPDF } from "../utils/Exportutils";
+import {  exportDetailedToExcel,  exportNormalToExcel } from "../utils/Exportutils";
 import { FaRupeeSign } from "react-icons/fa";
 
 const fetchCustomerReport = async (startDate: string, endDate: string, search: string, storeId: number| null) => {
@@ -110,15 +110,25 @@ const CustomerReportPage = () => {
     }
   };
 
-  const handleExport = (type: "normal" | "detailed", format: "excel" | "pdf") => {
+  const handleExport = (type: "normal" | "detailed", format: "excel" ) => {
+    // Get store name from the selected store ID
+    const storeName = selectedStore === 0 
+      ? "All Stores" 
+      : stores.find(store => store.id === selectedStore)?.storeName || "";
+  
+    // Create filter object
+    const filters = {
+      startDate,
+      endDate,
+      store: storeName,
+      search: search || undefined
+    };
+  
     if (type === "normal" && format === "excel") {
-      exportNormalToExcel(data);
-    } else if (type === "normal" && format === "pdf") {
-      exportNormalToPDF(data);
+      exportNormalToExcel(data, filters);
+    
     } else if (type === "detailed" && format === "excel") {
-      exportDetailedToExcel(data);
-    } else if (type === "detailed" && format === "pdf") {
-      exportDetailedToPDF(data);
+      exportDetailedToExcel(data, filters);
     }
   };
 
@@ -150,22 +160,11 @@ const CustomerReportPage = () => {
                     active ? "bg-blue-100 text-blue-900" : "text-gray-700"
                   } group flex items-center px-4 py-2 text-sm w-full`}
                 >
-                  Normal to Excel
+                  Summary report
                 </button>
               )}
             </Menu.Item>
-            <Menu.Item>
-              {({ active }) => (
-                <button
-                  onClick={() => handleExport("normal", "pdf")}
-                  className={`${
-                    active ? "bg-blue-100 text-blue-900" : "text-gray-700"
-                  } group flex items-center px-4 py-2 text-sm w-full`}
-                >
-                  Normal to PDF
-                </button>
-              )}
-            </Menu.Item>
+  
             <Menu.Item>
               {({ active }) => (
                 <button
@@ -174,22 +173,11 @@ const CustomerReportPage = () => {
                     active ? "bg-green-100 text-green-900" : "text-gray-700"
                   } group flex items-center px-4 py-2 text-sm w-full`}
                 >
-                  Detailed to Excel
+                  Detailed report
                 </button>
               )}
             </Menu.Item>
-            <Menu.Item>
-              {({ active }) => (
-                <button
-                  onClick={() => handleExport("detailed", "pdf")}
-                  className={`${
-                    active ? "bg-green-100 text-green-900" : "text-gray-700"
-                  } group flex items-center px-4 py-2 text-sm w-full`}
-                >
-                  Detailed to PDF
-                </button>
-              )}
-            </Menu.Item>
+
           </div>
         </Menu.Items>
       </Transition>
@@ -252,11 +240,14 @@ const CustomerReportPage = () => {
     >
       {/* Header Section */}
       <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-800">
-        <h2 className="text-2xl font-bold text-white">Customer Report</h2>
-        <p className="text-blue-100">
-          View detailed analytics of customer purchases, including sales and return bills.
-        </p>
-      </div>
+  <div className="flex items-center justify-between mb-2">
+    <h2 className="text-2xl font-bold text-white">Customer Report</h2>
+    {userRole === "admin" && <ExportDropdown />}
+  </div>
+  <p className="text-blue-100">
+    View detailed analytics of customer purchases, including sales and return bills.
+  </p>
+</div>
   
       {/* Filters and Data Table */}
       <div className="p-6">
@@ -318,13 +309,6 @@ const CustomerReportPage = () => {
   </div>
 </div>
 
-{/* Export Buttons */}
-{/* Export Dropdown */}
-{userRole === "admin" && (
-  <div className="flex justify-end mb-4">
-    <ExportDropdown />
-  </div>
-)}
   
         {/* Data Table */}
         {isLoading ? (

@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -91,6 +92,7 @@ model TelecallingCustomer {
   customerName      String
   customerPhone     String
   storeName         String?
+  address           String? 
   lastPurchaseDate  DateTime?
   remarks           String?  // Add a remarks field for telecalling
   status            String   @default("not send") 
@@ -140,4 +142,15 @@ model TelecallerHandledCustomer {
 
   telecaller   User     @relation(fields: [telecallerId], references: [id]) // Relation to the User model
   customer     TelecallingCustomer @relation(fields: [customerId], references: [id]) // Relation to the TelecallingCustomer model
+}
+
+model TelecallingNewCustomer {
+  id              Int      @id @default(autoincrement())
+  customerId      Int      @unique
+  storeName       String
+  customerName    String
+  customerPhone   String   @unique
+  address         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

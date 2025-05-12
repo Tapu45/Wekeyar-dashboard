@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import api, { API_ROUTES } from "../utils/api";
 import { ChevronDown, ChevronUp, Phone, Calendar, AlertCircle } from "lucide-react";
-import { exportNonBuyingToExcel, exportNonBuyingToPDF } from "../utils/Exportutils";
+import { exportNonBuyingToExcel} from "../utils/Exportutils";
 
 export interface NonBuyingCustomer {
   id: number;
@@ -26,10 +26,15 @@ const getUserRole = () => {
   }
 };
 
+// Modified function to handle the all stores case
 const getNonBuyingCustomers = async (days: number, storeId: number | null): Promise<NonBuyingCustomer[]> => {
-  const { data } = await api.get(API_ROUTES.NON_BUYING_CUSTOMERS, {
-    params: { days, storeId },
-  });
+  // Only include storeId in params if it's a specific store (not null and not 0)
+  const params: Record<string, any> = { days };
+  if (storeId !== null && storeId !== 0) {
+    params.storeId = storeId;
+  }
+  
+  const { data } = await api.get(API_ROUTES.NON_BUYING_CUSTOMERS, { params });
   return data;
 };
 
@@ -44,6 +49,7 @@ const NonBuyingCustomerReport: React.FC = () => {
   const { data, isLoading, error, refetch } = useQuery<NonBuyingCustomer[]>({
     queryKey: ["non-buying-customers", appliedDays, selectedStore],
     queryFn: () => getNonBuyingCustomers(appliedDays, selectedStore),
+    enabled: selectedStore !== null, // Only fetch data when a store is selected
   });
 
   const applyFilter = () => {
@@ -74,9 +80,15 @@ const NonBuyingCustomerReport: React.FC = () => {
 
   const handleExport = (format: string) => {
     if (format === "excel") {
-      exportNonBuyingToExcel(data || []); // Export to Excel
-    } else if (format === "pdf") {
-      exportNonBuyingToPDF(data || []); // Export to PDF
+      // Get store name for the selected store
+      const storeName = selectedStore === 0 
+        ? "All Stores" 
+        : stores.find(store => store.id === selectedStore)?.storeName || `Store ${selectedStore}`;
+        
+      exportNonBuyingToExcel(data || [], {
+        days: appliedDays,
+        store: storeName
+      });
     } else {
       alert("Please select a valid export format.");
     }
@@ -156,13 +168,15 @@ const NonBuyingCustomerReport: React.FC = () => {
         <div className="flex items-center space-x-2">
           <label className="text-sm font-medium text-blue-700">Store:</label>
           <select
-            value={selectedStore || ""}
-            onChange={(e) => setSelectedStore(Number(e.target.value))}
+            value={selectedStore === null ? "" : selectedStore === 0 ? "all" : selectedStore}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSelectedStore(value === "" ? null : value === "all" ? 0 : Number(value));
+            }}
             className="w-40 border border-blue-300 rounded-md shadow-sm py-1 px-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
           >
-            <option value="" disabled>
-              -- Select --
-            </option>
+            <option value="">-- Select Store --</option>
+            <option value="all">All Stores</option>
             {stores.map((store) => (
               <option key={store.id} value={store.id}>
                 {store.storeName}
@@ -172,21 +186,20 @@ const NonBuyingCustomerReport: React.FC = () => {
         </div>
 
         {userRole === "admin" && (
-  <div className="flex items-center space-x-4">
-    <select
-      value={exportFormat}
-      onChange={(e) => {
-        setExportFormat(e.target.value);
-        if (e.target.value) handleExport(e.target.value); // Trigger export on selection
-      }}
-      className="w-40 border border-blue-300 rounded-md shadow-sm py-1 px-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
-    >
-      <option value="">Export Format</option>
-      <option value="excel">Excel</option>
-      <option value="pdf">PDF</option>
-    </select>
-  </div>
-)}
+          <div className="flex items-center space-x-4">
+            <select
+              value={exportFormat}
+              onChange={(e) => {
+                setExportFormat(e.target.value);
+                if (e.target.value) handleExport(e.target.value); // Trigger export on selection
+              }}
+              className="w-40 border border-blue-300 rounded-md shadow-sm py-1 px-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+            >
+              <option value="">Export Format</option>
+              <option value="excel">Excel</option>
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="p-6">
@@ -200,21 +213,33 @@ const NonBuyingCustomerReport: React.FC = () => {
               onChange={(e) => setDays(parseInt(e.target.value) || 0)}
               className="w-24 h-10 px-3 font-medium text-center text-blue-800 bg-white border border-blue-300 rounded-lg"
               placeholder="Enter days"
-              disabled={!selectedStore}
+              disabled={selectedStore === null}
             />
 
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={applyFilter}
-              className="px-4 py-2 font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+              disabled={selectedStore === null}
+              className={`px-4 py-2 font-medium text-white rounded-lg ${
+                selectedStore === null ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+              }`}
             >
               Apply
             </motion.button>
           </div>
         </div>
 
-        {data && data.length > 0 ? (
+        {selectedStore === null ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-10 text-center bg-blue-50 rounded-xl"
+          >
+            <p className="text-xl font-medium text-blue-800">Please select a store to view data</p>
+            <p className="mt-2 text-blue-600">Customer data will appear here after selecting a store</p>
+          </motion.div>
+        ) : data && data.length > 0 ? (
           <motion.div className="space-y-4">
             <AnimatePresence>
               {visibleData.map((customer) => (

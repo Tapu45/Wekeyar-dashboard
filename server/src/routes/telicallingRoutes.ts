@@ -8,7 +8,8 @@ import {
   getNewProducts,
   updateCustomerRemarks,
   getTelecallerRemarksOrders,
-  addNewTelecallingCustomer, // Import the new controller function
+  addNewTelecallingCustomer,
+  getNewTelecallingCustomers, // Import the new controller function
 } from "../controllers/tellicallingController";
 import { authenticateUser } from "../authMiddleware";
 
@@ -42,5 +43,7 @@ router.get(
 );
 
 router.post("/customers/new", addNewTelecallingCustomer);
+
+router.get('/new-customers',  getNewTelecallingCustomers);
 
 export default router;

@@ -16,5 +16,6 @@ router.get("/new-products", tellicallingController_1.getNewProducts);
 router.patch("/customers/:id/remarks", authMiddleware_1.authenticateUser, tellicallingController_1.updateCustomerRemarks);
 router.get("/telecaller/remarks-orders", authMiddleware_1.authenticateUser, tellicallingController_1.getTelecallerRemarksOrders);
 router.post("/customers/new", tellicallingController_1.addNewTelecallingCustomer);
+router.get('/new-customers', tellicallingController_1.getNewTelecallingCustomers);
 exports.default = router;
 //# sourceMappingURL=telicallingRoutes.js.map

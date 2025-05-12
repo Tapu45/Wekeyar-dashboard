@@ -23,7 +23,7 @@ import {
   AlertCircle,
   Search
 } from "lucide-react"
-import { exportNonBuyingToExcel, exportNonBuyingToPDF } from "../utils/Exportutils"
+import { exportNonBuyingToExcel } from "../utils/Exportutils"
 
 export interface MonthlyNonBuyingCustomer {
   id: number
@@ -163,13 +163,7 @@ const NonBuyingMonthlyCustomer: React.FC = () => {
           totalPurchaseValue: 0, // Default value or calculate if available
         }))
       ); // Export to Excel
-    } else if (format === "pdf") {
-      exportNonBuyingToPDF(
-        filteredData.map(customer => ({
-          ...customer,
-          totalPurchaseValue: 0, // Default value or calculate if available
-        }))
-      ); // Export to PDF
+    
     } else {
       alert("Invalid format. Please enter 'excel' or 'pdf'.");
     }

@@ -7,7 +7,6 @@ import {
 } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import SummaryReport from "./components/SummaryReport";
-import NonBuyingCustomerReport from "./components/NonBuyingCustomerReport";
 import NonBuyingMonthlyCustomer from "./components/NonBuyingMonthlyCustomer";
 import CustomerReportPage from "./components/CustomerReport";
 import StoreWiseSalesReportPage from "./components/StoreReport";
@@ -22,6 +21,10 @@ import TelecallingDashboard from "./components/TelecallingDashboard";
 
 import UploadStatusPage from "./components/UploadStatusPage";
 import ProductUploadPage from "./components/ProductUpload";
+import UploadManager from "./components/upload";
+import CustomerAnalysisManager from "./components/Customer";
+
+import TelecallingCustomersPage from "./components/ManageCu";
 
 const queryClient = new QueryClient();
 
@@ -64,7 +67,7 @@ const App: React.FC = () => {
               path="non-buying-customers"
               element={
                 <ProtectedRoute allowedRoles={["admin", "tellecaller"]}>
-                  <NonBuyingCustomerReport />
+                  <CustomerAnalysisManager />
                 </ProtectedRoute>
               }
             />
@@ -109,10 +112,19 @@ const App: React.FC = () => {
               }
             /> */}
             <Route
-              path="upload"
+              path="Upload"
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <UploadPage />
+                </ProtectedRoute>
+              }
+            />
+
+<Route
+              path="upload-manager"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <UploadManager />
                 </ProtectedRoute>
               }
             />
@@ -121,6 +133,14 @@ const App: React.FC = () => {
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <UploadStatusPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="Add-new-customer"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "tellecaller"]}>
+                  <TelecallingCustomersPage />
                 </ProtectedRoute>
               }
             />

@@ -10,3 +10,4 @@ export declare const getTelecallersWithOrderCount: (_req: Request, res: Response
 export declare const updateCustomerRemarks: (req: CustomRequest, res: Response) => Promise<void>;
 export declare const getTelecallerRemarksOrders: (req: CustomRequest, res: Response) => Promise<void>;
 export declare const addNewTelecallingCustomer: (req: Request, res: Response) => Promise<void>;
+export declare const getNewTelecallingCustomers: (_req: Request, res: Response) => Promise<void>;

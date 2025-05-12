@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.addNewTelecallingCustomer = exports.getTelecallerRemarksOrders = exports.updateCustomerRemarks = exports.getTelecallersWithOrderCount = exports.getNewProducts = exports.getAllTelecallingOrders = exports.getTelecallingOrders = exports.saveTelecallingOrder = exports.getProducts = exports.getTelecallingCustomers = void 0;
+exports.getNewTelecallingCustomers = exports.addNewTelecallingCustomer = exports.getTelecallerRemarksOrders = exports.updateCustomerRemarks = exports.getTelecallersWithOrderCount = exports.getNewProducts = exports.getAllTelecallingOrders = exports.getTelecallingOrders = exports.saveTelecallingOrder = exports.getProducts = exports.getTelecallingCustomers = void 0;
 const client_1 = require("@prisma/client");
 const uuid_1 = require("uuid");
 const prisma = new client_1.PrismaClient();
@@ -349,24 +349,33 @@ const getTelecallerRemarksOrders = async (req, res) => {
 exports.getTelecallerRemarksOrders = getTelecallerRemarksOrders;
 const addNewTelecallingCustomer = async (req, res) => {
     try {
-        const { storeName, customerName, customerPhone } = req.body;
+        const { storeName, customerName, customerPhone, address } = req.body;
         if (!storeName || !customerName || !customerPhone) {
             res.status(400).json({ error: "Store name, customer name, and phone number are required." });
+            return;
+        }
+        const existingNewCustomer = await prisma.telecallingNewCustomer.findFirst({
+            where: { customerPhone },
+        });
+        if (existingNewCustomer) {
+            res.status(400).json({ error: "Customer with this phone number already exists in the new customers list." });
             return;
         }
         const existingCustomer = await prisma.telecallingCustomer.findFirst({
             where: { customerPhone },
         });
         if (existingCustomer) {
-            res.status(400).json({ error: "Customer with this phone number already exists." });
+            res.status(400).json({ error: "Customer with this phone number already exists in the main customers list." });
             return;
         }
-        const newCustomer = await prisma.telecallingCustomer.create({
+        const customerId = parseInt((0, uuid_1.v4)().replace(/-/g, "").slice(0, 4), 16);
+        const newCustomer = await prisma.telecallingNewCustomer.create({
             data: {
-                customerId: parseInt((0, uuid_1.v4)().replace(/-/g, "").slice(0, 4), 16),
+                customerId,
                 storeName,
                 customerName,
                 customerPhone,
+                address: address || null,
             },
         });
         res.status(201).json(newCustomer);
@@ -377,4 +386,19 @@ const addNewTelecallingCustomer = async (req, res) => {
     }
 };
 exports.addNewTelecallingCustomer = addNewTelecallingCustomer;
+const getNewTelecallingCustomers = async (_req, res) => {
+    try {
+        const newCustomers = await prisma.telecallingNewCustomer.findMany({
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+        res.status(200).json(newCustomers);
+    }
+    catch (error) {
+        console.error("Error fetching new telecalling customers:", error);
+        res.status(500).json({ error: "Failed to fetch new telecalling customers." });
+    }
+};
+exports.getNewTelecallingCustomers = getNewTelecallingCustomers;
 //# sourceMappingURL=tellicallingController.js.map

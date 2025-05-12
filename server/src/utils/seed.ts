@@ -3,11 +3,10 @@ const axios = require('axios');
 
 // Sample log data from your example
 const sampleBill = `Processing bill input
-RUCH/058
+RUCH/06
 02-04-2025
-S sdf
-001  TIME: 21:47
-7894011006
+001  TIME: 18:36
+8447167622
 CASH BILL
 RUCHIKA
 BHUBANESWAR
@@ -15,20 +14,32 @@ BHUBANESWAR
 ODRET00532/R ODRET00533/RC
 21AACCW4774G1ZD
 1
-LIV 52 TAB 100
+SOLSPRE SPRAY
 3004
-241214
-8/27
-195.00
-10.00
+K0009
+12/26
+506.93
+20.00
 6.00
 6.00
-156.70
-195.00
-Rs. One Hundred Seventy Six Only
-195.00
-19.50
-176.00
+362.08
+506.93
+1:0
+WYSOLONE DT 20MG TABS
+3004
+15
+9452
+3/26
+40.10
+20.00
+6.00
+6.00
+28.64
+40.10
+Rs. Four Hundred Thirty Eight Only
+547.03
+109.41
+438.00
 Our Software MARG Erp 9437026823,7978789800`;
 
 // Test function

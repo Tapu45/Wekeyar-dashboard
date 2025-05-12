@@ -573,14 +573,20 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
             console.log("Failed bill:", bill.error);
             console.log("Failed bill:", bill.error.includes("already exists"));
         })
-        if(failedBills.map((bill) => bill.error).includes("already exists")){
-            console.log("Failed bills, done fixing:", bill);
-            return res.status(200).json(
-                {
-                    success: true
-                }
-            )
-        }
+        const allMissingEssentialInfo = failedBills.every(bill => 
+          bill.error === "Missing essential bill information (bill number or date)" ||
+          bill.error.includes("already exists")
+      );
+      
+      // If all failures are due to missing essential info, return success to prevent retries
+      if (allMissingEssentialInfo) {
+          console.log("All bills failed due to missing essential info - marking as success to prevent retries");
+          return res.status(200).json({
+              success: true,
+              message: "Bills skipped due to missing essential information",
+              skippedBills: failedBills.length
+          });
+      }
         return res.status(400).json({ 
         success: false, 
         message: `All ${failedBills.length} bill(s) failed to process`,

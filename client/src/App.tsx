@@ -7,7 +7,6 @@ import {
 } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import SummaryReport from "./components/SummaryReport";
-import NonBuyingMonthlyCustomer from "./components/NonBuyingMonthlyCustomer";
 import CustomerReportPage from "./components/CustomerReport";
 import StoreWiseSalesReportPage from "./components/StoreReport";
 import CustomerList from "./components/CustomerList";

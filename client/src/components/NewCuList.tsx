@@ -19,7 +19,7 @@ interface NewTelecallingCustomersPageProps {
   viewMode?: 'grid' | 'list';
 }
 
-const NewTelecallingCustomersPage: React.FC<NewTelecallingCustomersPageProps> = ({ viewMode = 'list' }) => {
+const NewTelecallingCustomersPage: React.FC<NewTelecallingCustomersPageProps> = ({ }) => {
   const [customers, setCustomers] = useState<NewCustomer[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<NewCustomer | null>(null);

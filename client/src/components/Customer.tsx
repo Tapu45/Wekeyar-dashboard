@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Clock, TrendingDown, BarChart3 } from "lucide-react";
+import { Users, TrendingDown,  } from "lucide-react";
 import NonBuyingCustomerReport from "./NonBuyingCustomerReport";
 import NonBuyingMonthlyCustomer from "./NonBuyingMonthlyCustomer";
 

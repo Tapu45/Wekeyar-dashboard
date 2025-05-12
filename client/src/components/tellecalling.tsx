@@ -141,7 +141,7 @@ const Telecalling: React.FC = () => {
   const [selectedRemarkCustomerId, setSelectedRemarkCustomerId] = useState<number | null>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
-  const [newCustomerModalOpen, setNewCustomerModalOpen] = useState(false); // State for modal
+  const [, setNewCustomerModalOpen] = useState(false); // State for modal
 
   useEffect(() => {
     // Fetch telecalling customers
@@ -216,9 +216,7 @@ const Telecalling: React.FC = () => {
     setShowSuggestions(false);
   };
 
-  const handleAddNewCustomer = (newCustomers: Customer[]) => {
-    setCustomers((prev) => [...prev, ...newCustomers]); // Add all new customers to the list
-  };
+ 
 
   const handleOpenRemarksModal = (customerId: number, initialRemarks: string = "") => {
     setSelectedRemarkCustomerId(customerId);
@@ -353,9 +351,9 @@ const Telecalling: React.FC = () => {
       <ToastContainer />
       
       <NewCustomerModal
-      isOpen={newCustomerModalOpen} // Modal open state
-      onClose={() => setNewCustomerModalOpen(false)} // Close the modal
-      onSave={handleAddNewCustomer} // Save the new customer
+      // isOpen={newCustomerModalOpen} // Modal open state
+      // onClose={() => setNewCustomerModalOpen(false)} // Close the modal
+      // onSave={handleAddNewCustomer} // Save the new customer
     />
       
       {/* Remarks Modal */}

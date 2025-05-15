@@ -3,12 +3,12 @@ const axios = require('axios');
 
 // Sample log data from your example
 const sampleBill = `Processing bill input
-RUCH/06
+CS/903
 02-04-2025
 001  TIME: 18:36
 8447167622
 CASH BILL
-RUCHIKA
+DUMDUMA
 BHUBANESWAR
 7205959341
 ODRET00532/R ODRET00533/RC

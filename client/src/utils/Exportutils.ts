@@ -57,10 +57,7 @@ export const exportDetailedToExcel = (data: Customer[], filters?: {
           customer.customerName,
           customer.mobileNo,
           date.date,
-          `Rs${date.totalAmount.toLocaleString('en-IN', {
-            maximumFractionDigits: 2,
-            minimumFractionDigits: 2,
-          })}`,
+          date.totalAmount,
           bill.billNo,
           medicine.name,
           medicine.quantity,
@@ -144,10 +141,7 @@ export const exportNormalToExcel = (data: Customer[], filters?: {
     customer.mobileNo,
     
     customer.totalBills,
-    `${customer.totalAmount.toLocaleString('en-IN', {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2
-    })}`
+    customer.totalAmount 
   ]);
   
   // Combine all data

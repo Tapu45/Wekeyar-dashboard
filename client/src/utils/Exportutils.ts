@@ -34,6 +34,22 @@ export const exportDetailedToExcel = (data: Customer[], filters?: {
   // Create workbook
   const workbook = XLSX.utils.book_new();
   
+  // Calculate totals
+  const totalAmount = data.reduce((sum, customer) => {
+    return sum + (customer.totalAmount || 0);
+  }, 0);
+  
+  const totalQuantity = data.reduce((sum, customer) => {
+    if (!customer.dates) return sum;
+    return sum + customer.dates.reduce((dateSum, date) => {
+      return dateSum + date.salesBills.reduce((billSum, bill) => {
+        return billSum + bill.medicines.reduce((medSum: any, med: any) => {
+          return medSum + (med.quantity || 0);
+        }, 0);
+      }, 0);
+    }, 0);
+  }, 0);
+  
   // Prepare header data
   const headerData = [
     ["CUSTOMER DETAILED REPORT"],
@@ -43,6 +59,8 @@ export const exportDetailedToExcel = (data: Customer[], filters?: {
     ["Store:", filters?.store || "All Stores"],
     ["Search Filter:", filters?.search || "None"],
     ["Total Customers:", data.length.toString()],
+    ["Total Amount:", totalAmount.toString()],
+    ["Total Quantity:", totalQuantity.toString()],
     [""],
     [""] // Extra empty row before customer data begins
   ];
@@ -117,6 +135,15 @@ export const exportNormalToExcel = (data: Customer[], filters?: {
   // Create workbook
   const workbook = XLSX.utils.book_new();
   
+  // Calculate totals
+  const totalAmount = data.reduce((sum, customer) => {
+    return sum + (customer.totalAmount || 0);
+  }, 0);
+
+  const totalBills = data.reduce((sum, customer) => {
+    return sum + (customer.totalBills || 0);
+  }, 0);
+  
   // Prepare header data
   const headerData = [
     ["CUSTOMER SUMMARY REPORT"],
@@ -126,6 +153,8 @@ export const exportNormalToExcel = (data: Customer[], filters?: {
     ["Store:", filters?.store || "All Stores"],
     ["Search Filter:", filters?.search || "None"],
     ["Total Customers:", data.length.toString()],
+    ["Total Amount:", totalAmount.toString()],
+    ["Total Bills:", totalBills.toString()],
     [""],
     [""] // Extra empty row before customer data begins
   ];
@@ -139,7 +168,6 @@ export const exportNormalToExcel = (data: Customer[], filters?: {
   const customerData = data.map((customer) => [
     customer.customerName,
     customer.mobileNo,
-    
     customer.totalBills,
     customer.totalAmount 
   ]);

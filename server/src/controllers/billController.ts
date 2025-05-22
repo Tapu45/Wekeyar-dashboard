@@ -65,7 +65,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
 
         // Clean up log timestamps from each line
         const cleanedLines = lines.map((line: string) => {
-          return line.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
+          return line.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M|^May \d+ \d+:\d+:\d+ [AP]M/, '').trim();
         }).filter((line: string) => line !== '');
 
         // Extract bill number
@@ -162,8 +162,8 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
         if (billData.customerName && 
           (billData.customerName.match(/^[A-Z]+\/\d+$/) || // Format like RUCH/0393
            billData.customerName.match(/^[A-Z]{2}\d+$/))) { // Format like CN00007
-        billData.customerName = null;
-      }
+          billData.customerName = null;
+        }
         
         // Extract payment type
         if (paymentIndex !== -1) {
@@ -223,165 +223,176 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           }
         }
         
-        // Find "Rs." amount text line
-        const amountTextIndex = cleanedLines.findIndex((line: string) => 
-          line.startsWith("Rs.") && line.includes("Only")
-        );
+      const amountTextIndex = cleanedLines.findIndex((line: string) => 
+  line.startsWith("Rs.") && (line.includes("Only") || line.includes("only"))
+);
+
+// Extract monetary values
+if (amountTextIndex !== -1) {
+  billData.amountText = cleanedLines[amountTextIndex];
+  
+  // Find the index of "Our Software" or similar line
+  const softwareLineIndex = cleanedLines.findIndex((line: string) => 
+    line.toLowerCase().includes("our software") || 
+    line.toLowerCase().includes("software") ||
+    line.toLowerCase().includes("marg erp")
+  );
+  
+  if (softwareLineIndex !== -1) {
+    // Look for the LAST decimal amount before the software line
+    // (typically there are multiple values, with the final one being the amount paid)
+    const searchWindow = cleanedLines.slice(amountTextIndex + 1, softwareLineIndex);
+    
+    // Find the LAST amount in these lines - override previous values
+    let lastFoundAmount = null;
+    for (const line of searchWindow) {
+      if (line.match(/^\d+\.\d{2}$/)) {
+        lastFoundAmount = parseFloat(line);
+      }
+    }
+    
+    if (lastFoundAmount !== null) {
+      billData.amountPaid = lastFoundAmount;
+    }
+  }
+}
+
+// IMPROVED ITEM EXTRACTION LOGIC with support for all three formats
+const medicineItems: any[] = [];
+
+// Find where the actual medicine items start - typically after GST information
+const gstLineIndex = cleanedLines.findIndex((line: string) => 
+  /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]/.test(line)
+);
+
+// Start looking for items after the GST line
+const startIndex = gstLineIndex !== -1 ? gstLineIndex + 1 : 0;
+
+// Handle all formats for items
+for (let i = startIndex; i < cleanedLines.length; i++) {
+  const line = cleanedLines[i];
+  let matched = false;
+  let quantity = 0;
+  let itemName = '';
+  
+  // Don't process lines after "Rs." line (which indicates the bill summary)
+  if (line.startsWith("Rs.") && line.includes("Only")) {
+    break;
+  }
+  
+  // FORMAT 2: "0:4 DROTIN DS TAB" - Quantity with colon and item name on same line
+  if (/^\d+:\d+\s+\S/.test(line)) {
+    const quantityParts = line.split(' ');
+    if (quantityParts.length >= 2) {
+      // For "1:0" format, use the first digit as quantity
+      const quantityMatch = quantityParts[0].match(/^(\d+):(\d+)$/);
+      if (quantityMatch) {
+        // Try the first number first, if it's 0 then use the second number
+        const firstNumber = parseInt(quantityMatch[1]);
+        const secondNumber = parseInt(quantityMatch[2]);
+        quantity = firstNumber > 0 ? firstNumber : secondNumber;
+      } else {
+        quantity = 1; // Default if pattern doesn't match
+      }
+      
+      itemName = line.substring(line.indexOf(' ')).trim();
+      matched = true;
+    }
+  }
+  // FORMAT 3: Quantity with colon "1:0" on one line and item name on next line
+  else if (/^\d+:\d+$/.test(line)) {
+    const quantityMatch = line.match(/^(\d+):(\d+)$/);
+    if (quantityMatch && i + 1 < cleanedLines.length) {
+      // Check if next line could be item name
+      if (!(/^\d+$/.test(cleanedLines[i+1])) && 
+          !(/^\d{1,2}\/\d{2,4}$/.test(cleanedLines[i+1])) && 
+          !(/^[A-Z0-9]+$/.test(cleanedLines[i+1]) && cleanedLines[i+1].length <= 6) &&
+          !cleanedLines[i+1].startsWith("Rs.")) {
         
-        // Extract monetary values
-        if (amountTextIndex !== -1) {
-          billData.amountText = cleanedLines[amountTextIndex];
-          
-          // Find the index of "Our Software" or similar line
-          const softwareLineIndex = cleanedLines.findIndex((line: string) => 
-            line.toLowerCase().includes("our software") || 
-            line.toLowerCase().includes("software") ||
-            line.toLowerCase().includes("marg erp")
-          );
-          
-          if (softwareLineIndex !== -1) {
-            // Look for the last decimal amount before the software line
-            for (let i = softwareLineIndex - 1; i >= Math.max(0, amountTextIndex - 3); i--) {
-              const line = cleanedLines[i];
-              
-              // Match decimal amounts (e.g., 239.00)
-              if (line.match(/^\d+\.\d{2}$/)) {
-                billData.amountPaid = parseFloat(line);
-                break; // Found the amount paid
-              }
-            }
-          }
-          
-          // In case we couldn't find the software line or amount paid
-          if (!billData.amountPaid) {
-            // Process all decimal values around the amount text line
-            let decimalValues: number[] = [];
-            
-            for (let i = Math.max(0, amountTextIndex - 3); i < Math.min(cleanedLines.length, amountTextIndex + 4); i++) {
-              const line = cleanedLines[i];
-              
-              // Match decimal amounts (e.g., 239.00)
-              if (line.match(/^\d+\.\d{2}$/)) {
-                decimalValues.push(parseFloat(line));
-              }
-            }
-            
-            // Assign values based on the values found (largest is typically MRP, smallest might be discount)
-            if (decimalValues.length >= 3) {
-              decimalValues.sort((a, b) => a - b);
-              billData.calculatedAmount = decimalValues[1]; // Middle value
-              billData.netDiscount = decimalValues[0];     // Smallest value
-              billData.amountPaid = decimalValues[2];      // Largest value
-            } else if (decimalValues.length > 0) {
-              // If we only have one or two values, use the last one as amount paid
-              billData.amountPaid = decimalValues[decimalValues.length - 1];
-            }
-          }
+        // For "1:0" format, use the first digit as quantity
+        const firstNumber = parseInt(quantityMatch[1]);
+        const secondNumber = parseInt(quantityMatch[2]);
+        quantity = firstNumber > 0 ? firstNumber : secondNumber;
+        
+        itemName = cleanedLines[i+1];
+        matched = true;
+        i++; // Skip the item name line since we've processed it
+      }
+    }
+  }
+  // FORMAT 1: Just a single digit number alone (not phone numbers)
+  else if (/^[1-9]\d{0,2}$/.test(line)) { // Restrict to max 3 digits (999)
+    quantity = parseInt(line);
+    // Check if next line could be item name
+    if (i + 1 < cleanedLines.length && 
+        !(/^\d+$/.test(cleanedLines[i+1])) && 
+        !(/^\d{1,2}\/\d{2,4}$/.test(cleanedLines[i+1])) &&
+        !(/^[A-Z0-9]+$/.test(cleanedLines[i+1]) && cleanedLines[i+1].length <= 6) &&
+        !cleanedLines[i+1].startsWith("Rs.")) {
+      itemName = cleanedLines[i+1];
+      matched = true;
+      i++; // Skip the item name line since we've processed it
+    }
+  }
+  
+  if (matched) {
+    // Initialize the item object
+    const item: any = {
+      quantity: quantity,
+      item: itemName,
+      batch: '',
+      expBatch: '',
+      mrp: 0,
+      discount: 0
+    };
+    
+    // Look ahead for additional item information (batch, expiry, price)
+    let lineIndex = i + 1;
+    let decimalValuesFound = 0;
+    
+    while (lineIndex < cleanedLines.length && lineIndex < i + 10) {
+      const nextLine = cleanedLines[lineIndex];
+      
+      // Stop if we find the next item pattern or bill summary
+      if (/^\d+:\d+/.test(nextLine) || // New format patterns (any X:Y format)
+          /^[1-9]\d{0,2}$/.test(nextLine) || // Old format pattern (just a number)
+          nextLine.startsWith("Rs.")) { // End of items section
+        break;
+      }
+      
+      // Check for batch (usually an alphanumeric code on the line after item name)
+      if (lineIndex === i + 1 && /^[A-Z0-9]+$/.test(nextLine) && nextLine.length <= 6) {
+        item.batch = nextLine;
+      }
+      // Check for expiry date (usually in MM/YY format)
+      else if (/^\d{1,2}\/\d{2,4}$/.test(nextLine)) {
+        item.expBatch = nextLine;
+      }
+      // Process decimal values (prices)
+      else if (/^\d+\.\d{2}$/.test(nextLine)) {
+        decimalValuesFound++;
+        if (decimalValuesFound === 1) {
+          item.mrp = parseFloat(nextLine);
+        } else if (decimalValuesFound === 6) { // The 6th decimal value is typically the discount
+          item.discount = parseFloat(nextLine);
         }
-        
-        // Extract items - more robust algorithm
-        const medicineItems: any[] = [];
-        let itemStartIndices: number[] = [];
-        
-        // Find all potential item starts
-        // Items typically begin with a single digit or digit:digit format
-        cleanedLines.forEach((line: string, index: number) => {
-          if ((line.match(/^[1-9]$/) || line.match(/^[1-9]:[0-9]$/)) && index < cleanedLines.length - 5) {
-            itemStartIndices.push(index);
-          }
-        });
-        
-        // If no item starts were found with the above pattern, try more patterns
-        if (itemStartIndices.length === 0) {
-          cleanedLines.forEach((line: string, index: number) => {
-            // Look for lines that are just numbers followed by product names
-            if (line.match(/^[1-9]\d*$/) && 
-                index + 1 < cleanedLines.length && 
-                !cleanedLines[index + 1].match(/^\d+(\.\d{2})?$/)) {
-              itemStartIndices.push(index);
-            }
-          });
-        }
-        
-        // Process each potential item
-        for (let i = 0; i < itemStartIndices.length; i++) {
-          const startIndex = itemStartIndices[i];
-          const endIndex = i < itemStartIndices.length - 1 
-            ? itemStartIndices[i + 1] 
-            : Math.min(cleanedLines.length, startIndex + 15); // Limit item size
-          
-          // Get all lines that might be part of this item
-          const itemLines = cleanedLines.slice(startIndex, endIndex);
-          
-          // Basic validation - we need at least a few lines
-          if (itemLines.length < 4) continue;
-          
-          // Extract quantity
-          let quantity = parseInt(itemLines[0]);
-          if (isNaN(quantity)) {
-            // Try to extract from format like "1:0"
-            const parts = itemLines[0].split(':');
-            if (parts.length === 2) {
-              quantity = parseInt(parts[0]);
-            }
-            
-            if (isNaN(quantity)) continue;
-          }
-          
-          // Item name is the line after quantity
-          const itemName = itemLines[1];
-          
-          // Look for patterns in the item details
-          let batch = "";
-          let expBatch = "";
-          let mrp = 0;
-          let discount = 0;
-          
-          // Find batch number (typically numeric)
-          for (let j = 2; j < itemLines.length; j++) {
-            const line = itemLines[j];
-            
-            // Match batch number (digits only)
-            if (!batch && line.match(/^\d+$/)) {
-              batch = line;
-              continue;
-            }
-            
-            // Match expiry date (MM/YY format)
-            if (batch && !expBatch && line.match(/^\d{1,2}\/\d{2,4}$/)) {
-              expBatch = line;
-              continue;
-            }
-            
-            // Match MRP (decimal number)
-            if (expBatch && line.match(/^\d+\.\d{2}$/)) {
-              // If we already have MRP, this might be discount
-              if (mrp === 0) {
-                mrp = parseFloat(line);
-              } else if (discount === 0) {
-                discount = parseFloat(line);
-                break; // Found all needed item data
-              }
-            }
-          }
-          
-          // Only add item if we have all required fields
-          if (batch && expBatch && mrp > 0) {
-            medicineItems.push({
-              quantity,
-              item: itemName,
-              batch,
-              expBatch,
-              mrp,
-              discount
-            });
-          }
-        }
-        
-        // Update items array if we found any valid items
-        if (medicineItems.length > 0) {
-          billData.items = medicineItems;
-        }
+      }
+      
+      lineIndex++;
+    }
+    
+    // Add the item to our list
+    medicineItems.push(item);
+  }
+}
+
+// Use the medicine items we extracted
+if (medicineItems.length > 0) {
+  billData.items = medicineItems;
+}
+
+// Remove duplicate code - this was repeated twice in the original
+
         
         // Debug log the extracted bill data
         console.log("Extracted bill data:", JSON.stringify(billData, null, 2));

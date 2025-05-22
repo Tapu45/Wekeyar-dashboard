@@ -49,7 +49,7 @@ async function postDailyBills(req, res) {
                     items: []
                 };
                 const cleanedLines = lines.map((line) => {
-                    return line.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M/, '').trim();
+                    return line.replace(/^Apr \d+ \d+:\d+:\d+ [AP]M|^May \d+ \d+:\d+:\d+ [AP]M/, '').trim();
                 }).filter((line) => line !== '');
                 for (let i = 0; i < cleanedLines.length; i++) {
                     const line = cleanedLines[i];
@@ -157,107 +157,116 @@ async function postDailyBills(req, res) {
                         }
                     }
                 }
-                const amountTextIndex = cleanedLines.findIndex((line) => line.startsWith("Rs.") && line.includes("Only"));
+                const amountTextIndex = cleanedLines.findIndex((line) => line.startsWith("Rs.") && (line.includes("Only") || line.includes("only")));
                 if (amountTextIndex !== -1) {
                     billData.amountText = cleanedLines[amountTextIndex];
                     const softwareLineIndex = cleanedLines.findIndex((line) => line.toLowerCase().includes("our software") ||
                         line.toLowerCase().includes("software") ||
                         line.toLowerCase().includes("marg erp"));
                     if (softwareLineIndex !== -1) {
-                        for (let i = softwareLineIndex - 1; i >= Math.max(0, amountTextIndex - 3); i--) {
-                            const line = cleanedLines[i];
+                        const searchWindow = cleanedLines.slice(amountTextIndex + 1, softwareLineIndex);
+                        let lastFoundAmount = null;
+                        for (const line of searchWindow) {
                             if (line.match(/^\d+\.\d{2}$/)) {
-                                billData.amountPaid = parseFloat(line);
-                                break;
+                                lastFoundAmount = parseFloat(line);
                             }
                         }
-                    }
-                    if (!billData.amountPaid) {
-                        let decimalValues = [];
-                        for (let i = Math.max(0, amountTextIndex - 3); i < Math.min(cleanedLines.length, amountTextIndex + 4); i++) {
-                            const line = cleanedLines[i];
-                            if (line.match(/^\d+\.\d{2}$/)) {
-                                decimalValues.push(parseFloat(line));
-                            }
-                        }
-                        if (decimalValues.length >= 3) {
-                            decimalValues.sort((a, b) => a - b);
-                            billData.calculatedAmount = decimalValues[1];
-                            billData.netDiscount = decimalValues[0];
-                            billData.amountPaid = decimalValues[2];
-                        }
-                        else if (decimalValues.length > 0) {
-                            billData.amountPaid = decimalValues[decimalValues.length - 1];
+                        if (lastFoundAmount !== null) {
+                            billData.amountPaid = lastFoundAmount;
                         }
                     }
                 }
                 const medicineItems = [];
-                let itemStartIndices = [];
-                cleanedLines.forEach((line, index) => {
-                    if ((line.match(/^[1-9]$/) || line.match(/^[1-9]:[0-9]$/)) && index < cleanedLines.length - 5) {
-                        itemStartIndices.push(index);
+                const gstLineIndex = cleanedLines.findIndex((line) => /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]/.test(line));
+                const startIndex = gstLineIndex !== -1 ? gstLineIndex + 1 : 0;
+                for (let i = startIndex; i < cleanedLines.length; i++) {
+                    const line = cleanedLines[i];
+                    let matched = false;
+                    let quantity = 0;
+                    let itemName = '';
+                    if (line.startsWith("Rs.") && line.includes("Only")) {
+                        break;
                     }
-                });
-                if (itemStartIndices.length === 0) {
-                    cleanedLines.forEach((line, index) => {
-                        if (line.match(/^[1-9]\d*$/) &&
-                            index + 1 < cleanedLines.length &&
-                            !cleanedLines[index + 1].match(/^\d+(\.\d{2})?$/)) {
-                            itemStartIndices.push(index);
-                        }
-                    });
-                }
-                for (let i = 0; i < itemStartIndices.length; i++) {
-                    const startIndex = itemStartIndices[i];
-                    const endIndex = i < itemStartIndices.length - 1
-                        ? itemStartIndices[i + 1]
-                        : Math.min(cleanedLines.length, startIndex + 15);
-                    const itemLines = cleanedLines.slice(startIndex, endIndex);
-                    if (itemLines.length < 4)
-                        continue;
-                    let quantity = parseInt(itemLines[0]);
-                    if (isNaN(quantity)) {
-                        const parts = itemLines[0].split(':');
-                        if (parts.length === 2) {
-                            quantity = parseInt(parts[0]);
-                        }
-                        if (isNaN(quantity))
-                            continue;
-                    }
-                    const itemName = itemLines[1];
-                    let batch = "";
-                    let expBatch = "";
-                    let mrp = 0;
-                    let discount = 0;
-                    for (let j = 2; j < itemLines.length; j++) {
-                        const line = itemLines[j];
-                        if (!batch && line.match(/^\d+$/)) {
-                            batch = line;
-                            continue;
-                        }
-                        if (batch && !expBatch && line.match(/^\d{1,2}\/\d{2,4}$/)) {
-                            expBatch = line;
-                            continue;
-                        }
-                        if (expBatch && line.match(/^\d+\.\d{2}$/)) {
-                            if (mrp === 0) {
-                                mrp = parseFloat(line);
+                    if (/^\d+:\d+\s+\S/.test(line)) {
+                        const quantityParts = line.split(' ');
+                        if (quantityParts.length >= 2) {
+                            const quantityMatch = quantityParts[0].match(/^(\d+):(\d+)$/);
+                            if (quantityMatch) {
+                                const firstNumber = parseInt(quantityMatch[1]);
+                                const secondNumber = parseInt(quantityMatch[2]);
+                                quantity = firstNumber > 0 ? firstNumber : secondNumber;
                             }
-                            else if (discount === 0) {
-                                discount = parseFloat(line);
+                            else {
+                                quantity = 1;
+                            }
+                            itemName = line.substring(line.indexOf(' ')).trim();
+                            matched = true;
+                        }
+                    }
+                    else if (/^\d+:\d+$/.test(line)) {
+                        const quantityMatch = line.match(/^(\d+):(\d+)$/);
+                        if (quantityMatch && i + 1 < cleanedLines.length) {
+                            if (!(/^\d+$/.test(cleanedLines[i + 1])) &&
+                                !(/^\d{1,2}\/\d{2,4}$/.test(cleanedLines[i + 1])) &&
+                                !(/^[A-Z0-9]+$/.test(cleanedLines[i + 1]) && cleanedLines[i + 1].length <= 6) &&
+                                !cleanedLines[i + 1].startsWith("Rs.")) {
+                                const firstNumber = parseInt(quantityMatch[1]);
+                                const secondNumber = parseInt(quantityMatch[2]);
+                                quantity = firstNumber > 0 ? firstNumber : secondNumber;
+                                itemName = cleanedLines[i + 1];
+                                matched = true;
+                                i++;
+                            }
+                        }
+                    }
+                    else if (/^[1-9]\d{0,2}$/.test(line)) {
+                        quantity = parseInt(line);
+                        if (i + 1 < cleanedLines.length &&
+                            !(/^\d+$/.test(cleanedLines[i + 1])) &&
+                            !(/^\d{1,2}\/\d{2,4}$/.test(cleanedLines[i + 1])) &&
+                            !(/^[A-Z0-9]+$/.test(cleanedLines[i + 1]) && cleanedLines[i + 1].length <= 6) &&
+                            !cleanedLines[i + 1].startsWith("Rs.")) {
+                            itemName = cleanedLines[i + 1];
+                            matched = true;
+                            i++;
+                        }
+                    }
+                    if (matched) {
+                        const item = {
+                            quantity: quantity,
+                            item: itemName,
+                            batch: '',
+                            expBatch: '',
+                            mrp: 0,
+                            discount: 0
+                        };
+                        let lineIndex = i + 1;
+                        let decimalValuesFound = 0;
+                        while (lineIndex < cleanedLines.length && lineIndex < i + 10) {
+                            const nextLine = cleanedLines[lineIndex];
+                            if (/^\d+:\d+/.test(nextLine) ||
+                                /^[1-9]\d{0,2}$/.test(nextLine) ||
+                                nextLine.startsWith("Rs.")) {
                                 break;
                             }
+                            if (lineIndex === i + 1 && /^[A-Z0-9]+$/.test(nextLine) && nextLine.length <= 6) {
+                                item.batch = nextLine;
+                            }
+                            else if (/^\d{1,2}\/\d{2,4}$/.test(nextLine)) {
+                                item.expBatch = nextLine;
+                            }
+                            else if (/^\d+\.\d{2}$/.test(nextLine)) {
+                                decimalValuesFound++;
+                                if (decimalValuesFound === 1) {
+                                    item.mrp = parseFloat(nextLine);
+                                }
+                                else if (decimalValuesFound === 6) {
+                                    item.discount = parseFloat(nextLine);
+                                }
+                            }
+                            lineIndex++;
                         }
-                    }
-                    if (batch && expBatch && mrp > 0) {
-                        medicineItems.push({
-                            quantity,
-                            item: itemName,
-                            batch,
-                            expBatch,
-                            mrp,
-                            discount
-                        });
+                        medicineItems.push(item);
                     }
                 }
                 if (medicineItems.length > 0) {

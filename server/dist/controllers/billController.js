@@ -93,6 +93,7 @@ async function postDailyBills(req, res) {
                                 if (!line.match(/^\d{2}-\d{2}-\d{4}$/) &&
                                     !line.includes("TIME:") &&
                                     !line.match(/^\d+$/) &&
+                                    !line.match(/^\d{1,2}:\d{2}$/) &&
                                     line.length > 2) {
                                     billData.customerName = line;
                                     break;
@@ -106,8 +107,10 @@ async function postDailyBills(req, res) {
                             const line = cleanedLines[i];
                             if (!line.includes("TIME:") &&
                                 !line.match(/^\d+$/) &&
+                                !line.match(/^\d{1,2}:\d{2}$/) &&
                                 !line.includes("BILL") &&
                                 !line.includes("/") &&
+                                !line.match(/^(CASH|CREDIT)$/) &&
                                 line.length > 2) {
                                 billData.customerName = line;
                                 break;
@@ -332,7 +335,6 @@ async function postDailyBills(req, res) {
                         where: { phone: "9999999999" },
                         update: {
                             name: "Cashlist Customer",
-                            ...(billData.customerAddress && { address: billData.customerAddress })
                         },
                         create: {
                             name: "Cashlist Customer",

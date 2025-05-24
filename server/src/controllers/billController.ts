@@ -125,6 +125,7 @@ const paymentIndex = cleanedLines.findIndex((line: string) =>
                 if (!line.match(/^\d{2}-\d{2}-\d{4}$/) && 
                     !line.includes("TIME:") &&
                     !line.match(/^\d+$/) &&
+                     !line.match(/^\d{1,2}:\d{2}$/) &&
                     line.length > 2) {
                   billData.customerName = line;
                   break;
@@ -143,8 +144,10 @@ const paymentIndex = cleanedLines.findIndex((line: string) =>
               // Skip lines that are clearly not names
               if (!line.includes("TIME:") && 
                   !line.match(/^\d+$/) && 
+                  !line.match(/^\d{1,2}:\d{2}$/) &&
                   !line.includes("BILL") &&
                   !line.includes("/") && 
+                  !line.match(/^(CASH|CREDIT)$/) && 
                   line.length > 2) {
                 billData.customerName = line;
                 break;
@@ -469,7 +472,7 @@ if (medicineItems.length > 0) {
             update: {
               name: "Cashlist Customer",
               // Only update address if provided
-              ...(billData.customerAddress && { address: billData.customerAddress })
+              
             },
             create: {
               name: "Cashlist Customer",

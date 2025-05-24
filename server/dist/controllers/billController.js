@@ -80,7 +80,8 @@ async function postDailyBills(req, res) {
                 else {
                     billData.date = new Date();
                 }
-                const paymentIndex = cleanedLines.findIndex((line) => line.includes("BILL") && (line.includes("CASH") || line.includes("CREDIT")));
+                const paymentIndex = cleanedLines.findIndex((line) => (line.includes("BILL") && (line.includes("CASH") || line.includes("CREDIT"))) ||
+                    (line.trim() === "CASH" || line.trim() === "CREDIT"));
                 billData.customerName = null;
                 billData.customerPhone = null;
                 if (paymentIndex > 0) {

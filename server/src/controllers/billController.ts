@@ -100,10 +100,12 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           billData.date = new Date();
         }
         
-        // Find "CASH BILL" or similar payment identifier
-        const paymentIndex = cleanedLines.findIndex((line: string) => 
-          line.includes("BILL") && (line.includes("CASH") || line.includes("CREDIT"))
-        );
+       
+       // Find "CASH BILL" or similar payment identifier
+const paymentIndex = cleanedLines.findIndex((line: string) => 
+  (line.includes("BILL") && (line.includes("CASH") || line.includes("CREDIT"))) ||
+  (line.trim() === "CASH" || line.trim() === "CREDIT")
+);
         
         // Extract customer information - improved extraction to avoid misinterpretation
         billData.customerName = null;

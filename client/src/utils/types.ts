@@ -66,6 +66,7 @@ export interface SummaryReport {
   }
   
   export interface Trends {
+    currentMonth: any;
     previousDay: TrendData;
     previousWeek: TrendData;
     previousMonth: TrendData;

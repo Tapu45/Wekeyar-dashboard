@@ -33,7 +33,7 @@ interface RemarksModalProps {
   onSave: (customerId: number, remarks: string) => void;
 }
 
-// Remarks Modal Component
+// Responsive Remarks Modal Component
 const RemarksModal: React.FC<RemarksModalProps> = ({
   isOpen,
   onClose,
@@ -68,41 +68,44 @@ const RemarksModal: React.FC<RemarksModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <motion.div
         ref={modalRef}
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
-        className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
+        className="bg-white rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md mx-auto"
       >
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold text-gray-800 flex items-center">
-            <MessageSquare className="text-blue-600 mr-2" size={20} />
-            Customer Remarks
+          <h3 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center">
+            <MessageSquare className="text-blue-600 mr-2" size={18} />
+            <span className="truncate">Customer Remarks</span>
           </h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+          <button 
+            onClick={onClose} 
+            className="text-gray-500 hover:text-gray-700 p-1 rounded-md hover:bg-gray-100"
+          >
             <X size={20} />
           </button>
         </div>
 
         <textarea
-          className="w-full border border-gray-300 rounded-md p-3 h-32 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          className="w-full border border-gray-300 rounded-md p-3 h-24 sm:h-32 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm sm:text-base"
           value={remarks}
           onChange={(e) => setRemarks(e.target.value)}
           placeholder="Add remarks about this customer..."
         />
 
-        <div className="flex justify-end mt-4 space-x-3">
+        <div className="flex flex-col sm:flex-row justify-end mt-4 space-y-2 sm:space-y-0 sm:space-x-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
+            className="w-full sm:w-auto px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors text-sm sm:text-base"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm sm:text-base"
           >
             Save Remarks
           </button>
@@ -136,7 +139,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
   // Pagination for product search
   const [page, setPage] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
-  const pageSize = 10; // Limit results per request
+  const pageSize = 10;
 
   const fetchProducts = useCallback(async (searchTerm: string, pageNum: number = 1) => {
     if (searchTerm.trim() === "") {
@@ -155,7 +158,6 @@ const OrderForm: React.FC<OrderFormProps> = ({
         },
       });
       
-      // Update depending on if it's a new search or pagination
       if (pageNum === 1) {
         setProducts(response.data.products || response.data);
         setTotalProducts(response.data.total || response.data.length);
@@ -176,35 +178,29 @@ const OrderForm: React.FC<OrderFormProps> = ({
 
   // Handle product search with debounce
   useEffect(() => {
-    // Clear any existing timeout
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
 
-    // Don't search if the input is empty
     if (productName.trim() === "") {
       setProducts([]);
       setShowSuggestions(false);
       return;
     }
 
-    // If the product name matches exactly what was just selected, don't search again
     if (productName === selectedProductName && selectedProductName !== "") {
       return;
     }
 
-    // Reset selected product when user types
     if (selectedProductName !== "" && productName !== selectedProductName) {
       setSelectedProductName("");
     }
 
-    // Reset pagination on new search
     setPage(1);
     
-    // Create a new timeout for debouncing
     debounceTimeoutRef.current = setTimeout(() => {
       fetchProducts(productName, 1);
-    }, 400); // Increased debounce timeout
+    }, 400);
 
     return () => {
       if (debounceTimeoutRef.current) {
@@ -255,14 +251,12 @@ const OrderForm: React.FC<OrderFormProps> = ({
       { productName, quantity, isNewProduct },
     ]);
     
-    // Reset product selection state
     setProductName("");
     setSelectedProductName("");
     setQuantity(1);
     setShowSuggestions(false);
     setProducts([]);
     
-    // Focus back on the input for next entry
     if (productInputRef.current) {
       productInputRef.current.focus();
     }
@@ -283,7 +277,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
     const requestBody = {
       telecallingCustomerId: selectedCustomerId,
       products: orderProducts,
-      remarks: remarks, // Include remarks with the order
+      remarks: remarks,
     };
 
     setLoading(true);
@@ -366,7 +360,6 @@ const OrderForm: React.FC<OrderFormProps> = ({
     setSelectedProductName(name);
     setShowSuggestions(false);
     
-    // Focus on quantity field after selection
     const quantityInput = document.querySelector('input[type="number"]') as HTMLInputElement;
     if (quantityInput) {
       quantityInput.focus();
@@ -377,11 +370,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
     setRemarksModalOpen(true);
   };
 
-  // Handle Enter key to add product
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && productName.trim() !== "") {
-      // If suggestions are open and product name doesn't match a selected product,
-      // select the first product or continue with the current product name
       if (showSuggestions && selectedProductName === "") {
         if (products.length > 0) {
           handleSelectProduct(products[0].name);
@@ -389,7 +379,6 @@ const OrderForm: React.FC<OrderFormProps> = ({
           handleAddProduct();
         }
       } else {
-        // If product is already selected or suggestions are closed
         handleAddProduct();
       }
     }
@@ -408,32 +397,38 @@ const OrderForm: React.FC<OrderFormProps> = ({
         onSave={handleSaveRemarkOnly}
       />
       
-      <div className="p-5 border-b border-gray-200 flex justify-between items-center">
-        <h2 className="text-xl font-bold text-gray-800 flex items-center">
-          <ShoppingCart className="text-blue-600 mr-2" size={20} />
-          Create New Order {customerName ? `for ${customerName}` : ''}
+      {/* Header - Responsive */}
+      <div className="p-3 sm:p-5 border-b border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center min-w-0">
+          <ShoppingCart className="text-blue-600 mr-2 flex-shrink-0" size={20} />
+          <span className="truncate">
+            Create New Order {customerName ? `for ${customerName}` : ''}
+          </span>
         </h2>
         <button
           onClick={handleOpenRemarksModal}
-          className="px-4 py-2 bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200 transition-colors flex items-center"
+          className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200 transition-colors flex items-center justify-center text-sm sm:text-base"
         >
-          <MessageSquare className="mr-2" size={16} />
-          Add Remarks Only
+          <MessageSquare className="mr-2 flex-shrink-0" size={16} />
+          <span>Add Remarks Only</span>
         </button>
       </div>
       
-      <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
+      <div className="p-3 sm:p-6">
+        {/* Main Content Grid - Responsive */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          {/* Product Input Section */}
+          <div className="space-y-4 order-1">
+            {/* Product Name Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                 Product Name
               </label>
               <div className="relative">
                 <input
                   ref={productInputRef}
                   type="text"
-                  className="w-full border border-gray-300 rounded-md p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full border border-gray-300 rounded-md p-2 sm:p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm sm:text-base"
                   value={productName}
                   onChange={(e) => setProductName(e.target.value)}
                   onFocus={() => {
@@ -444,21 +439,22 @@ const OrderForm: React.FC<OrderFormProps> = ({
                   onKeyDown={handleKeyDown}
                   placeholder="Search for products..."
                 />
+                {/* Product Suggestions - Responsive */}
                 {showSuggestions && (
                   <motion.div
                     ref={suggestionsRef}
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                    className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 sm:max-h-60 overflow-y-auto"
                   >
                     {searchLoading && products.length === 0 && (
-                      <div className="p-3 text-gray-600 text-center">
+                      <div className="p-3 text-gray-600 text-center text-sm">
                         Loading products...
                       </div>
                     )}
                     
                     {!searchLoading && products.length === 0 && productName.trim() !== "" && (
-                      <div className="p-3 text-gray-600">
+                      <div className="p-3 text-gray-600 text-sm">
                         No products found. You can add a new product.
                       </div>
                     )}
@@ -469,12 +465,12 @@ const OrderForm: React.FC<OrderFormProps> = ({
                           <motion.li
                             key={product.id}
                             whileHover={{ backgroundColor: "rgba(243, 244, 246, 1)" }}
-                            className="p-3 flex justify-between items-center cursor-pointer"
+                            className="p-2 sm:p-3 flex justify-between items-center cursor-pointer"
                             onClick={() => handleSelectProduct(product.name)}
                           >
-                            <div className="flex items-center">
-                              <Package className="text-blue-600 mr-2" size={16} />
-                              <span>{product.name}</span>
+                            <div className="flex items-center min-w-0">
+                              <Package className="text-blue-600 mr-2 flex-shrink-0" size={14} />
+                              <span className="text-sm sm:text-base truncate">{product.name}</span>
                             </div>
                           </motion.li>
                         ))}
@@ -483,7 +479,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
                           <li className="p-2 text-center">
                             <button 
                               onClick={handleLoadMore}
-                              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                              className="text-blue-600 hover:text-blue-800 text-xs sm:text-sm font-medium"
                               disabled={searchLoading}
                             >
                               {searchLoading ? "Loading more..." : "Load more products"}
@@ -500,14 +496,14 @@ const OrderForm: React.FC<OrderFormProps> = ({
                       productName.trim() !== "" && (
                         <motion.div
                           whileHover={{ backgroundColor: "rgba(243, 244, 246, 1)" }}
-                          className="p-3 flex justify-between items-center bg-yellow-50 cursor-pointer"
+                          className="p-2 sm:p-3 flex justify-between items-center bg-yellow-50 cursor-pointer"
                           onClick={() => handleSelectProduct(productName)}
                         >
-                          <div className="flex items-center">
-                            <Plus className="text-blue-600 mr-2" size={16} />
-                            <span>{productName}</span>
+                          <div className="flex items-center min-w-0">
+                            <Plus className="text-blue-600 mr-2 flex-shrink-0" size={14} />
+                            <span className="text-sm sm:text-base truncate">{productName}</span>
                           </div>
-                          <span className="text-xs text-white bg-blue-500 px-2 py-1 rounded-md">
+                          <span className="text-xs text-white bg-blue-500 px-2 py-1 rounded-md flex-shrink-0">
                             New
                           </span>
                         </motion.div>
@@ -516,73 +512,97 @@ const OrderForm: React.FC<OrderFormProps> = ({
                 )}
               </div>
             </div>
+
+            {/* Quantity Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                 Quantity
               </label>
               <input
                 type="number"
-                className="w-full border border-gray-300 rounded-md p-3"
+                className="w-full border border-gray-300 rounded-md p-2 sm:p-3 text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 value={quantity}
                 onChange={(e) => setQuantity(Number(e.target.value))}
                 min={1}
               />
             </div>
+
+            {/* Add Product Button */}
             <button
               onClick={handleAddProduct}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              className="w-full sm:w-auto px-4 py-2 sm:py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm sm:text-base font-medium"
             >
               Add Product
             </button>
           </div>
-          <div>
-            <h3 className="block text-sm font-medium text-gray-700 mb-3">
-              Products in Order
+
+          {/* Products in Order Section */}
+          <div className="order-2 lg:order-2">
+            <h3 className="block text-sm font-medium text-gray-700 mb-2 sm:mb-3">
+              Products in Order ({orderProducts.length})
             </h3>
             {orderProducts.length > 0 ? (
-              <ul className="space-y-2 max-h-60 overflow-y-auto">
+              <div className="space-y-2 max-h-48 sm:max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2">
                 {orderProducts.map((product, index) => (
-                  <li
+                  <motion.div
                     key={index}
-                    className="flex items-center justify-between bg-gray-100 p-3 rounded-md"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center justify-between bg-gray-50 p-2 sm:p-3 rounded-md"
                   >
-                    <div>
-                      <p className="font-medium">{product.productName}</p>
-                      <p className="text-sm text-gray-600">Quantity: {product.quantity}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm sm:text-base truncate">
+                        {product.productName}
+                        {product.isNewProduct && (
+                          <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                            New
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs sm:text-sm text-gray-600">
+                        Quantity: {product.quantity}
+                      </p>
                     </div>
                     <button
                       onClick={() => handleRemoveProduct(index)}
-                      className="text-red-500 hover:text-red-700"
+                      className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 ml-2 flex-shrink-0"
                     >
                       <X size={16} />
                     </button>
-                  </li>
+                  </motion.div>
                 ))}
-              </ul>
+              </div>
             ) : (
-              <p className="text-gray-600 bg-gray-100 p-4 rounded-md">No products added yet.</p>
+              <div className="text-gray-600 bg-gray-100 p-4 rounded-md text-center text-sm sm:text-base">
+                No products added yet.
+              </div>
             )}
           </div>
         </div>
 
-        {/* Optional remarks section directly in the form */}
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+        {/* Order Remarks Section - Responsive */}
+        <div className="mt-4 sm:mt-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
             Order Remarks (Optional)
           </label>
           <textarea
-            className="w-full border border-gray-300 rounded-md p-3 h-20 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            className="w-full border border-gray-300 rounded-md p-2 sm:p-3 h-16 sm:h-20 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm sm:text-base"
             value={remarks}
             onChange={(e) => setRemarks(e.target.value)}
             placeholder="Add any notes about this order or customer..."
           />
         </div>
 
-        <div className="mt-6 flex justify-end">
+        {/* Save Button - Responsive */}
+        <div className="mt-4 sm:mt-6 flex justify-end">
           <button
             onClick={handleSaveOrder}
-            disabled={loading}
-            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            disabled={loading || orderProducts.length === 0}
+            className={`w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 rounded-md transition-colors text-sm sm:text-base font-medium ${
+              loading || orderProducts.length === 0
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "bg-blue-600 text-white hover:bg-blue-700"
+            }`}
           >
             {loading ? "Saving..." : "Save Order"}
           </button>

@@ -217,9 +217,7 @@ export const getNonBuyingMonthlyCustomers = async (
   }
 };
 
-/**
- * 4. Customer Purchase History
- */
+
 export const getCustomerReport = async (
   req: Request,
   res: Response

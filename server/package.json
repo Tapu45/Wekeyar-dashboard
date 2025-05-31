@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "npm run build && node dist/index"
+    "start": "npm run build && node dist/index",
     "dev": "nodemon --ignore src/utils/seed.ts src/index.ts",
     "build": "tsc",
     "prisma:generate": "prisma generate",

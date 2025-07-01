@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import logger from "src/utils/PrintLog";
+import { logger } from "./lib/PrintLog";
 
 export async function postDailyBills(req: Request, res: Response): Promise<Response> {
   const prisma = new PrismaClient();

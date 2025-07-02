@@ -43,6 +43,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
       "RUCHIKA",
       "WEKEYAR PLUS",
       "MAUSIMAA SQUARE",
+      "MOUSIMAA", 
       "DUMDUMA",
       "SUM HOSPITAL",
       "SAMANTARAPUR",

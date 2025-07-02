@@ -31,6 +31,7 @@ async function postDailyBills(req, res) {
             "RUCHIKA",
             "WEKEYAR PLUS",
             "MAUSIMAA SQUARE",
+            "MOUSIMAA",
             "DUMDUMA",
             "SUM HOSPITAL",
             "SAMANTARAPUR",

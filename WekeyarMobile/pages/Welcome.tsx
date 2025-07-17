@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -7,12 +7,15 @@ import {
   ScrollView,
   Animated,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import { AuthStorage } from '../utils/AuthStorage';
 
 type RootStackParamList = {
   Login: undefined;
+  Dashboard: undefined;
 };
 
 type Props = {};
@@ -21,6 +24,10 @@ const { width, height } = Dimensions.get('window');
 
 const Welcome: React.FC<Props> = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  
+  // State
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -39,6 +46,34 @@ const Welcome: React.FC<Props> = () => {
   const floatingAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    checkAuthenticationStatus();
+  }, []);
+
+  useEffect(() => {
+    if (!isCheckingAuth) {
+      startAnimations();
+    }
+  }, [isCheckingAuth]);
+
+  const checkAuthenticationStatus = async () => {
+    try {
+      const authenticated = await AuthStorage.isAuthenticated();
+      setIsAuthenticated(authenticated);
+      
+      if (authenticated) {
+        // User is already logged in, navigate to dashboard after a short delay
+        setTimeout(() => {
+          navigation.navigate('Dashboard');
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+    } finally {
+      setIsCheckingAuth(false);
+    }
+  };
+
+  const startAnimations = () => {
     // Start entrance animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -137,7 +172,7 @@ const Welcome: React.FC<Props> = () => {
         useNativeDriver: true,
       }).start();
     }, 2000);
-  }, []);
+  };
 
   const handleGetStarted = () => {
     Animated.sequence([
@@ -152,9 +187,66 @@ const Welcome: React.FC<Props> = () => {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      navigation.navigate('Login');
+      if (isAuthenticated) {
+        navigation.navigate('Dashboard');
+      } else {
+        navigation.navigate('Login');
+      }
     });
   };
+
+  // Show loading screen while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar barStyle="dark-content" backgroundColor="white" translucent={false} />
+        
+        {/* Animated Logo */}
+        <Animated.View 
+          style={{
+            width: 120,
+            height: 120,
+            backgroundColor: '#2563eb',
+            borderRadius: 60,
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 30,
+            transform: [{ scale: pulseAnim }],
+            shadowColor: '#2563eb',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.3,
+            shadowRadius: 20,
+            elevation: 15,
+          }}
+        >
+          <Text style={{ fontSize: 48, fontWeight: '900', color: 'white', letterSpacing: 2 }}>
+            WK
+          </Text>
+        </Animated.View>
+
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text style={{ 
+          marginTop: 20, 
+          fontSize: 18, 
+          color: '#64748b', 
+          fontWeight: '500' 
+        }}>
+          {isAuthenticated ? 'Welcome back! Redirecting...' : 'Loading...'}
+        </Text>
+        
+        {isAuthenticated && (
+          <Text style={{ 
+            marginTop: 10, 
+            fontSize: 14, 
+            color: '#2563eb', 
+            fontWeight: '600' 
+          }}>
+            Taking you to Dashboard
+          </Text>
+        )}
+      </View>
+    );
+  }
 
   const features = [
     { 
@@ -210,7 +302,7 @@ const Welcome: React.FC<Props> = () => {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* White Background with Decorative Elements */}
+      {/* ...existing decorative elements... */}
       <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
         
         {/* Floating Decorative Circles */}
@@ -221,7 +313,7 @@ const Welcome: React.FC<Props> = () => {
             right: 20,
             width: 140,
             height: 140,
-            backgroundColor: '#eff6ff', // blue-50
+            backgroundColor: '#eff6ff',
             borderRadius: 70,
             opacity: glowOpacity,
             transform: [
@@ -237,7 +329,7 @@ const Welcome: React.FC<Props> = () => {
             left: -40,
             width: 100,
             height: 100,
-            backgroundColor: '#dbeafe', // blue-100
+            backgroundColor: '#dbeafe',
             borderRadius: 50,
             opacity: glowOpacity,
             transform: [
@@ -253,7 +345,7 @@ const Welcome: React.FC<Props> = () => {
             right: -30,
             width: 120,
             height: 120,
-            backgroundColor: '#bfdbfe', // blue-200
+            backgroundColor: '#bfdbfe',
             borderRadius: 60,
             opacity: glowOpacity,
             transform: [
@@ -269,7 +361,7 @@ const Welcome: React.FC<Props> = () => {
             left: 20,
             width: 80,
             height: 80,
-            backgroundColor: '#93c5fd', // blue-300
+            backgroundColor: '#93c5fd',
             borderRadius: 40,
             opacity: glowOpacity,
             transform: [
@@ -286,7 +378,7 @@ const Welcome: React.FC<Props> = () => {
           contentContainerStyle={{ paddingTop: 60, paddingBottom: 30, paddingHorizontal: 20 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Animated Header Section with Logo */}
+          {/* ...existing header section... */}
           <Animated.View 
             style={{
               alignItems: 'center',
@@ -301,7 +393,7 @@ const Welcome: React.FC<Props> = () => {
                 style={{
                   width: 128,
                   height: 128,
-                  backgroundColor: '#2563eb', // blue-600
+                  backgroundColor: '#2563eb',
                   borderRadius: 64,
                   justifyContent: 'center',
                   alignItems: 'center',
@@ -321,14 +413,13 @@ const Welcome: React.FC<Props> = () => {
                 </Text>
               </Animated.View>
               
-              {/* Animated Decorative Rings */}
               <Animated.View 
                 style={{
                   position: 'absolute',
                   width: 160,
                   height: 160,
                   borderWidth: 4,
-                  borderColor: '#60a5fa', // blue-400
+                  borderColor: '#60a5fa',
                   borderRadius: 80,
                   borderStyle: 'dashed',
                   transform: [{ scale: pulseAnim }],
@@ -341,7 +432,7 @@ const Welcome: React.FC<Props> = () => {
                   width: 192,
                   height: 192,
                   borderWidth: 2,
-                  borderColor: '#3b82f6', // blue-500
+                  borderColor: '#3b82f6',
                   borderRadius: 96,
                   transform: [{ scale: pulseAnim }, { rotate: logoRotate }],
                   opacity: 0.3,
@@ -350,7 +441,7 @@ const Welcome: React.FC<Props> = () => {
             </View>
           </Animated.View>
 
-          {/* Animated Title Section */}
+          {/* ...existing title section... */}
           <Animated.View 
             style={{
               alignItems: 'center',
@@ -362,7 +453,7 @@ const Welcome: React.FC<Props> = () => {
             <Text style={{ 
               fontSize: 20, 
               fontWeight: '300', 
-              color: '#64748b', // slate-500
+              color: '#64748b',
               marginBottom: 4, 
               letterSpacing: 1 
             }}>
@@ -372,7 +463,7 @@ const Welcome: React.FC<Props> = () => {
             <Text style={{ 
               fontSize: 48, 
               fontWeight: '900', 
-              color: '#1e293b', // slate-800
+              color: '#1e293b',
               marginBottom: 8, 
               letterSpacing: 1 
             }}>
@@ -382,20 +473,19 @@ const Welcome: React.FC<Props> = () => {
             <Text style={{ 
               fontSize: 24, 
               fontWeight: '600', 
-              color: '#2563eb', // blue-600
+              color: '#2563eb',
               letterSpacing: 1 
             }}>
               Dashboard
             </Text>
 
-            {/* Animated gradient line replacement */}
             <Animated.View 
               style={{
                 width: 96,
                 height: 4,
                 marginTop: 20,
                 borderRadius: 2,
-                backgroundColor: '#60a5fa', // blue-400
+                backgroundColor: '#60a5fa',
                 transform: [{ scaleX: fadeAnim }]
               }}
             >
@@ -405,14 +495,14 @@ const Welcome: React.FC<Props> = () => {
                   right: 0,
                   width: '50%',
                   height: '100%',
-                  backgroundColor: '#2563eb', // blue-600
+                  backgroundColor: '#2563eb',
                   borderRadius: 2,
                 }}
               />
             </Animated.View>
           </Animated.View>
 
-          {/* Enhanced Description */}
+          {/* ...existing description... */}
           <Animated.View 
             style={{
               marginBottom: 40,
@@ -423,7 +513,7 @@ const Welcome: React.FC<Props> = () => {
           >
             <Text style={{ 
               fontSize: 18, 
-              color: '#475569', // slate-600
+              color: '#475569',
               textAlign: 'center', 
               lineHeight: 28, 
               fontWeight: '400', 
@@ -433,7 +523,7 @@ const Welcome: React.FC<Props> = () => {
             </Text>
           </Animated.View>
 
-          {/* Animated Features Grid */}
+          {/* ...existing features grid... */}
           <View style={{ marginBottom: 40 }}>
             {features.map((feature, index) => (
               <Animated.View 
@@ -442,7 +532,7 @@ const Welcome: React.FC<Props> = () => {
                   backgroundColor: '#ffffff',
                   borderRadius: 16,
                   borderWidth: 1,
-                  borderColor: '#e2e8f0', // slate-200
+                  borderColor: '#e2e8f0',
                   marginBottom: 16,
                   overflow: 'hidden',
                   opacity: featureAnims[index],
@@ -481,7 +571,7 @@ const Welcome: React.FC<Props> = () => {
                     <Text style={{ 
                       fontSize: 18, 
                       fontWeight: 'bold', 
-                      color: '#1e293b', // slate-800
+                      color: '#1e293b',
                       marginBottom: 4, 
                       letterSpacing: 0.5 
                     }}>
@@ -489,7 +579,7 @@ const Welcome: React.FC<Props> = () => {
                     </Text>
                     <Text style={{ 
                       fontSize: 14, 
-                      color: '#64748b', // slate-500
+                      color: '#64748b',
                       lineHeight: 20 
                     }}>
                       {feature.desc}
@@ -497,7 +587,6 @@ const Welcome: React.FC<Props> = () => {
                   </View>
                 </View>
                 
-                {/* Animated border glow */}
                 <Animated.View 
                   style={{
                     position: 'absolute',
@@ -518,7 +607,7 @@ const Welcome: React.FC<Props> = () => {
             ))}
           </View>
 
-          {/* Enhanced Call-to-Action Button */}
+          {/* Updated Call-to-Action Button */}
           <View style={{ alignItems: 'center', marginBottom: 32 }}>
             <Animated.View
               style={{
@@ -528,7 +617,7 @@ const Welcome: React.FC<Props> = () => {
               <Pressable 
                 onPress={handleGetStarted}
                 style={{
-                  backgroundColor: '#2563eb', // blue-600
+                  backgroundColor: '#2563eb',
                   borderRadius: 25,
                   paddingHorizontal: 64,
                   paddingVertical: 20,
@@ -542,7 +631,6 @@ const Welcome: React.FC<Props> = () => {
                   elevation: 8,
                 }}
               >
-                {/* Gradient effect overlay */}
                 <View 
                   style={{
                     position: 'absolute',
@@ -550,7 +638,7 @@ const Welcome: React.FC<Props> = () => {
                     top: 0,
                     bottom: 0,
                     width: '50%',
-                    backgroundColor: '#1d4ed8', // blue-700
+                    backgroundColor: '#1d4ed8',
                     borderTopRightRadius: 25,
                     borderBottomRightRadius: 25,
                     opacity: 0.8,
@@ -565,7 +653,7 @@ const Welcome: React.FC<Props> = () => {
                   letterSpacing: 0.5,
                   zIndex: 1,
                 }}>
-                  Get Started
+                  {isAuthenticated ? 'Go to Dashboard' : 'Get Started'}
                 </Text>
                 <View style={{ 
                   width: 36, 
@@ -582,7 +670,7 @@ const Welcome: React.FC<Props> = () => {
             </Animated.View>
           </View>
 
-          {/* Enhanced Footer */}
+          {/* ...existing footer... */}
           <Animated.View 
             style={{ 
               alignItems: 'center',
@@ -594,7 +682,7 @@ const Welcome: React.FC<Props> = () => {
                 style={{ 
                   width: 12, 
                   height: 12, 
-                  backgroundColor: '#60a5fa', // blue-400
+                  backgroundColor: '#60a5fa',
                   borderRadius: 6, 
                   marginHorizontal: 4,
                   transform: [{ scale: pulseAnim }] 
@@ -605,7 +693,7 @@ const Welcome: React.FC<Props> = () => {
             </View>
             <Text style={{ 
               fontSize: 14, 
-              color: '#64748b', // slate-500
+              color: '#64748b',
               fontWeight: '500', 
               letterSpacing: 0.5 
             }}>

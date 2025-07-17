@@ -2,35 +2,34 @@
 const axios = require('axios');
 
 // Sample log data from your example
+// ...existing code...
 const sampleBill = `Processing bill input
-MM/0001
-01-07-2023
-RAJASHREE SAHOO
-002  TIME: 16:11
-80936639087
+VSS/11133
+09-01-2024
+001,12:48
 CASH BILL
-AMITAVsh RATH
-MOUSIMAA
+VSS NAGAR
 BHUBANESWAR
-7205959344
-KH-38197/RKH-38198/RCKH-16114/RX
+7205959349
+KH38883R KH38884RC KH16457RX
 21AACCW4774G1ZD
-4:0
-ZOLSOMA-10MG
-3004
-2174D
-9/26
-130.50
-20.00
+1
+REBALANZ ORS ORANGE 200ML
+200980
+H046
+11/25
+40.00
+5.00
 6.00
 6.00
-372.86
-522.00
-Rs. Four Hundred Eighteen Only
-522.00
-104.40
-418.00
+33.92
+40.00
+Rs. Thirty Eight Only
+40.00
+2.00
+38.00
 Our Software MARG Erp 9437026823,7978789800`;
+// ...existing code...
 
 // Test function
 async function testPostDailyBills() {

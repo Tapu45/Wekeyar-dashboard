@@ -18,10 +18,9 @@ const prisma = new PrismaClient({
 });
 const BATCH_SIZE = 50;
 const BILL_PREFIXES = ["CSP", "DUM", "GGP", "IRC", "KV", "MM", "RUCH", "SAM", "SUM", "VSS", "CS", "CN"];
-const BILL_REGEX = new RegExp(`^(${BILL_PREFIXES.join("|")})\\/\\d+$`);
+const BILL_REGEX = new RegExp(`^(${BILL_PREFIXES.join("|")})\\/\\d+`, "i");
 const KNOWN_STORES = [
     "RUCHIKA",
-    "WEKEYAR PLUS",
     "MAUSIMAA SQUARE",
     "MOUSIMAA",
     "DUMDUMA",
@@ -31,7 +30,7 @@ const KNOWN_STORES = [
     "CHANDRASEKHARPUR",
     "KALINGA VIHAR",
     "VSS NAGAR",
-    "IRC VILLAGE"
+    "IRC VILAGE"
 ];
 const STORE_REGEX = new RegExp(KNOWN_STORES.map(store => store.replace(/\s+/g, '\\s+')).join('|'), 'i');
 async function executeWithRetry(operation, maxRetries = 3) {
@@ -110,7 +109,7 @@ async function processExcelFile() {
                 rowValueArray.push(cell.value ? String(cell.value).trim() : "");
             });
             const rowString = rowValueArray.join(" ");
-            if (!storeInfo.name && rowString.includes("PLOT NO")) {
+            if (!storeInfo.name) {
                 for (const store of KNOWN_STORES) {
                     if (rowString.toUpperCase().includes(store.toUpperCase())) {
                         storeInfo.name = store;
@@ -214,13 +213,20 @@ async function processExcelFile() {
                 return BILL_REGEX.test(strValue);
             });
         }
-        function extractBillNumber(rowArray) {
-            for (const value of rowArray) {
+        function extractBillNumberAndFirstItem(rowArray) {
+            for (let idx = 0; idx < rowArray.length; idx++) {
+                const value = rowArray[idx];
                 if (!value)
                     continue;
-                const strValue = String(value).trim();
-                if (BILL_REGEX.test(strValue)) {
-                    return strValue;
+                let strValue = String(value).trim();
+                strValue = strValue.replace(/\-+\s*Mobile\s*\-+/i, '').trim();
+                const match = strValue.match(BILL_REGEX);
+                if (match) {
+                    const billNo = match[0];
+                    const rest = strValue.replace(billNo, '').trim();
+                    const firstItemRowArray = [...rowArray];
+                    firstItemRowArray[idx] = rest;
+                    return { billNo, firstItemRowArray };
                 }
             }
             return null;
@@ -350,7 +356,10 @@ async function processExcelFile() {
                 };
             }
             else if (currentCustomer && isBillNumberRow(rowArray)) {
-                const billNo = extractBillNumber(rowArray);
+                const billInfo = extractBillNumberAndFirstItem(rowArray);
+                if (!billInfo)
+                    continue;
+                const { billNo, firstItemRowArray } = billInfo;
                 let billDate = lastValidDate;
                 for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
                     if (isDateRow(sheetRows[j])) {
@@ -372,6 +381,10 @@ async function processExcelFile() {
                 const payments = extractCashAndCredit(rowArray, billNo);
                 newBill.cash = payments.cash;
                 newBill.credit = payments.credit;
+                const firstItem = extractItemDetails(firstItemRowArray);
+                if (firstItem && firstItem.name) {
+                    newBill.items.push(firstItem);
+                }
                 currentCustomerBills.push(newBill);
                 currentBill = newBill;
             }
@@ -469,7 +482,7 @@ async function processExcelFile() {
         if (currentCustomerBills.length > 0) {
             billRecords.push(...currentCustomerBills);
         }
-        console.log(`Processed ${billRecords.length} bills, preparing for database insertion`);
+        console.log(`Processed ${billRecords.length} bills, preparing for database insertionnnn`);
         const validBillRecords = billRecords.filter((bill) => {
             if (bill.cash === 0 && bill.credit === 0 && bill.totalAmount > 0) {
                 bill.cash = bill.totalAmount;

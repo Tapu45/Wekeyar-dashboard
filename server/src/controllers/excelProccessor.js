@@ -22,11 +22,11 @@ const prisma = new PrismaClient({
 const BATCH_SIZE = 50;
 
 const BILL_PREFIXES = ["CSP", "DUM", "GGP", "IRC", "KV", "MM", "RUCH", "SAM", "SUM", "VSS", "CS", "CN"];
-const BILL_REGEX = new RegExp(`^(${BILL_PREFIXES.join("|")})\\/\\d+$`);
+const BILL_REGEX = new RegExp(`^(${BILL_PREFIXES.join("|")})\\/\\d+`, "i");
 
 const KNOWN_STORES = [
   "RUCHIKA",
-  "WEKEYAR PLUS",
+  //"WEKEYAR PLUS",
   "MAUSIMAA SQUARE",
   "MOUSIMAA",
   "DUMDUMA",
@@ -36,7 +36,7 @@ const KNOWN_STORES = [
   "CHANDRASEKHARPUR",
   "KALINGA VIHAR",
   "VSS NAGAR",
-  "IRC VILLAGE"
+  "IRC VILAGE"
 ];
 
 const STORE_REGEX = new RegExp(KNOWN_STORES.map(store =>
@@ -144,7 +144,7 @@ async function processExcelFile() {
       const rowString = rowValueArray.join(" ");
 
       // Look for store name in the address line (usually line 2, with "PLOT NO")
-      if (!storeInfo.name && rowString.includes("PLOT NO")) {
+      if (!storeInfo.name) {
         // Try to find a matching store name in the line
         for (const store of KNOWN_STORES) {
           if (rowString.toUpperCase().includes(store.toUpperCase())) {
@@ -277,16 +277,26 @@ async function processExcelFile() {
       });
     }
 
-    function extractBillNumber(rowArray) {
-      for (const value of rowArray) {
+   function extractBillNumberAndFirstItem(rowArray) {
+    for (let idx = 0; idx < rowArray.length; idx++) {
+        const value = rowArray[idx];
         if (!value) continue;
-        const strValue = String(value).trim();
-        if (BILL_REGEX.test(strValue)) {
-          return strValue;
+        let strValue = String(value).trim();
+        // Remove any trailing '- Mobile -' or similar text
+        strValue = strValue.replace(/\-+\s*Mobile\s*\-+/i, '').trim();
+        const match = strValue.match(BILL_REGEX);
+        if (match) {
+            const billNo = match[0];
+            // Remove billNo from cell to get first item text
+            const rest = strValue.replace(billNo, '').trim();
+            // Clone rowArray and replace this cell with just the item text
+            const firstItemRowArray = [...rowArray];
+            firstItemRowArray[idx] = rest;
+            return { billNo, firstItemRowArray };
         }
-      }
-      return null;
     }
+    return null;
+}
 
     function isItemRow(rowArray) {
       let hasQuantity = false;
@@ -456,36 +466,41 @@ async function processExcelFile() {
         };
       }
       // Bill number row
-      else if (currentCustomer && isBillNumberRow(rowArray)) {
-        const billNo = extractBillNumber(rowArray);
-
-        let billDate = lastValidDate;
-        for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
-          if (isDateRow(sheetRows[j])) {
+    // ...existing code...
+else if (currentCustomer && isBillNumberRow(rowArray)) {
+    const billInfo = extractBillNumberAndFirstItem(rowArray);
+    if (!billInfo) continue;
+    const { billNo, firstItemRowArray } = billInfo;
+    let billDate = lastValidDate;
+    for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
+        if (isDateRow(sheetRows[j])) {
             billDate = extractDate(sheetRows[j]);
             lastValidDate = billDate;
             break;
-          }
         }
-
-        const newBill = {
-          billNo: billNo,
-          customerPhone: currentCustomer.phone,
-          customerName: currentCustomer.name,
-          date: billDate,
-          items: [],
-          totalAmount: 0,
-          cash: 0,
-          credit: 0,
-        };
-
-        const payments = extractCashAndCredit(rowArray, billNo);
-        newBill.cash = payments.cash;
-        newBill.credit = payments.credit;
-
-        currentCustomerBills.push(newBill);
-        currentBill = newBill;
-      }
+    }
+    const newBill = {
+        billNo: billNo,
+        customerPhone: currentCustomer.phone,
+        customerName: currentCustomer.name,
+        date: billDate,
+        items: [],
+        totalAmount: 0,
+        cash: 0,
+        credit: 0,
+    };
+    const payments = extractCashAndCredit(rowArray, billNo);
+    newBill.cash = payments.cash;
+    newBill.credit = payments.credit;
+    // If the cell had both billNo and item, extract the first item
+    const firstItem = extractItemDetails(firstItemRowArray);
+    if (firstItem && firstItem.name) {
+        newBill.items.push(firstItem);
+    }
+    currentCustomerBills.push(newBill);
+    currentBill = newBill;
+}
+// ...existing code...
       // Item row
       else if (currentBill && isItemRow(rowArray)) {
         const item = extractItemDetails(rowArray);
@@ -619,7 +634,7 @@ async function processExcelFile() {
 
     // Fill in missing payment info and validate bills
     console.log(
-      `Processed ${billRecords.length} bills, preparing for database insertion`
+      `Processed ${billRecords.length} bills, preparing for database insertionnnn`
     );
     const validBillRecords = billRecords.filter((bill) => {
       // Fill in missing payment info if needed
@@ -632,7 +647,9 @@ async function processExcelFile() {
     });
 
     console.log(`Found ${validBillRecords.length} valid bills to insert`);
-    
+//     validBillRecords.forEach((bill, idx) => {
+//     console.log(`Bill #${idx + 1}:`, JSON.stringify(bill, null, 2));
+// });
 
     // Process store data first
     console.time("Database operations");

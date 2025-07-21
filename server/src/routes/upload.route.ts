@@ -1,7 +1,7 @@
 import express from 'express';
 import { uploadMiddleware } from '../middleware';
 import { uploadExcelFile, getUploadHistory, getUploadStatus, deleteUploadHistory, uploadLogsSSE } from '../controllers/uploadController';
-import { postDailyBills } from '../controllers/billController';
+//import { postDailyBills } from '../controllers/billController';
 
 const router = express.Router();
 
@@ -26,7 +26,7 @@ router.delete("/upload/history/:id?", deleteUploadHistory);
 router.get("/upload/status/:id", getUploadStatus);
 router.get("/upload/logs/:id", uploadLogsSSE);
 
-router.post("/upload/daily/bill", postDailyBills);
+//router.post("/upload/daily/bill", postDailyBills);
 
 
 

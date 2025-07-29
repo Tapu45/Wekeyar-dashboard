@@ -341,20 +341,15 @@ async function processExcelFile() {
                     if (!value || isNaN(parseFloat(value)))
                         continue;
                     const amount = parseFloat(value);
-                    if (amount < 10)
-                        continue;
-                    if (cash === 0) {
-                        cash = amount;
+                    if (amount < 0) {
+                        credit += Math.abs(amount);
                     }
-                    else if (amount < 0) {
-                        credit = Math.abs(amount);
-                        cash -= credit;
-                    }
+                    cash += amount;
                 }
             }
             if (cash === 0 && billIndex >= 0) {
                 const billCell = String(rowArray[billIndex]);
-                const amountMatch = billCell.match(/\s+([\d.]+)$/);
+                const amountMatch = billCell.match(/\s+([\d.\-]+)/);
                 if (amountMatch) {
                     cash = parseFloat(amountMatch[1]);
                 }
@@ -367,10 +362,9 @@ async function processExcelFile() {
                         if (!value || isNaN(parseFloat(value)))
                             continue;
                         const amount = parseFloat(value);
-                        if (amount >= 10) {
-                            cash = amount;
-                            break;
-                        }
+                        cash += amount;
+                        if (amount < 0)
+                            credit += Math.abs(amount);
                     }
                 }
             }

@@ -436,36 +436,32 @@ async function processExcelFile() {
       let cash = 0;
       let credit = 0;
 
-      // First pass: Look for amounts in columns after the bill number
+      // Find the bill number index
       const billIndex = rowArray.findIndex(cell =>
         cell && String(cell).includes(billNo)
       );
 
       if (billIndex >= 0) {
-        // Look for cash/credit values in subsequent columns
+        // Sum all numbers after the bill number cell
         for (let i = billIndex + 1; i < rowArray.length; i++) {
           const value = rowArray[i];
           if (!value || isNaN(parseFloat(value))) continue;
 
           const amount = parseFloat(value);
 
-          // Skip small numbers that might be quantities
-          if (amount < 10) continue;
-
-          if (cash === 0) {
-            cash = amount;
-          } else if (amount < 0) {
-            // Negative amount is credit
-            credit = Math.abs(amount);
-            cash -= credit;
+          // If negative, treat as credit
+          if (amount < 0) {
+            credit += Math.abs(amount);
           }
+          // Add all values (positive or negative) to cash
+          cash += amount;
         }
       }
 
       // Second pass: If no amounts found yet, check the bill number cell itself
       if (cash === 0 && billIndex >= 0) {
         const billCell = String(rowArray[billIndex]);
-        const amountMatch = billCell.match(/\s+([\d.]+)$/);
+        const amountMatch = billCell.match(/\s+([\d.\-]+)/);
         if (amountMatch) {
           cash = parseFloat(amountMatch[1]);
         }
@@ -483,10 +479,8 @@ async function processExcelFile() {
             if (!value || isNaN(parseFloat(value))) continue;
 
             const amount = parseFloat(value);
-            if (amount >= 10) {  // Skip small numbers
-              cash = amount;
-              break;
-            }
+            cash += amount;
+            if (amount < 0) credit += Math.abs(amount);
           }
         }
       }

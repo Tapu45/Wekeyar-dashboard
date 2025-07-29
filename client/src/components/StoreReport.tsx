@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import api, { API_ROUTES } from "../utils/api";
 import { StoreWiseSalesReport, StoreReport } from "../utils/types";
 import { motion } from "framer-motion";
+import { exportStoreReportToExcel } from "../utils/Exportutils";
 
 const fetchStoreWiseSalesReport = async (date: string, searchQuery: string): Promise<StoreWiseSalesReport> => {
   const { data } = await api.get<StoreWiseSalesReport>(API_ROUTES.STORE_SALES_REPORT, {
@@ -132,6 +133,28 @@ const StoreWiseSalesReportPage: React.FC = () => {
                 Table
               </button>
             </div>
+
+             {data && data.storeReports.length > 0 && (
+    <button
+      onClick={() => exportStoreReportToExcel(data.storeReports, data.selectedDate)}
+      className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-300 shadow-md"
+    >
+      <svg 
+        className="w-5 h-5" 
+        fill="none" 
+        stroke="currentColor" 
+        viewBox="0 0 24 24"
+      >
+        <path 
+          strokeLinecap="round" 
+          strokeLinejoin="round" 
+          strokeWidth={2} 
+          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+        />
+      </svg>
+      Export
+    </button>
+  )}
             
             <button
               onClick={handleApplyFilters}

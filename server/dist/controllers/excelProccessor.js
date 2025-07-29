@@ -21,7 +21,6 @@ const BILL_PREFIXES = ["CSP", "DUM", "GGP", "IRC", "KV", "MM", "RUCH", "SAM", "S
 const BILL_REGEX = new RegExp(`^(${BILL_PREFIXES.join("|")})\\/\\d+`, "i");
 const KNOWN_STORES = [
     "RUCHIKA",
-    "MAUSIMAA SQUARE",
     "MOUSIMAA",
     "DUMDUMA",
     "SUM HOSPITAL",
@@ -30,7 +29,7 @@ const KNOWN_STORES = [
     "CHANDRASEKHARPUR",
     "KALINGA VIHAR",
     "VSS NAGAR",
-    "IRC VILAGE"
+    "IRC VILLAGE"
 ];
 const STORE_REGEX = new RegExp(KNOWN_STORES.map(store => store.replace(/\s+/g, '\\s+')).join('|'), 'i');
 async function executeWithRetry(operation, maxRetries = 3) {
@@ -109,11 +108,23 @@ async function processExcelFile() {
                 rowValueArray.push(cell.value ? String(cell.value).trim() : "");
             });
             const rowString = rowValueArray.join(" ");
+            const STORE_NAME_MAPPINGS = {
+                'IRC VILAGE': 'IRC VILLAGE',
+            };
             if (!storeInfo.name) {
                 for (const store of KNOWN_STORES) {
                     if (rowString.toUpperCase().includes(store.toUpperCase())) {
                         storeInfo.name = store;
                         break;
+                    }
+                }
+                if (!storeInfo.name) {
+                    const normalizedRowString = rowString.toUpperCase().trim();
+                    for (const [variant, correctName] of Object.entries(STORE_NAME_MAPPINGS)) {
+                        if (normalizedRowString.includes(variant.toUpperCase())) {
+                            storeInfo.name = correctName;
+                            break;
+                        }
                     }
                 }
                 if (rowValueArray[0]) {

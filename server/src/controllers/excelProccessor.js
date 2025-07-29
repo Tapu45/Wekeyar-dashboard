@@ -293,44 +293,50 @@ async function processExcelFile() {
     }
 
     function extractBillNumberAndFirstItem(rowArray) {
-  for (let idx = 0; idx < rowArray.length; idx++) {
-    const value = rowArray[idx];
-    if (!value) continue;
-    let strValue = String(value).trim();
-    
-    // Remove any trailing '- Mobile -' or similar text
-    strValue = strValue.replace(/\-+\s*Mobile\s*\-+/i, '').trim();
-    
-    const match = strValue.match(BILL_REGEX);
-    if (match) {
-      const billNo = match[0];
-      
-      // Remove billNo from cell to get remaining text
-      let rest = strValue.replace(billNo, '').trim();
-      
-      // Check for repeated words or doctor references
-      if (rest) {
-        // Pattern for repeated words (e.g., "MADHAB MADHAB")
-        const repeatedWordMatch = rest.match(/^(\w+)\s+\1$/i);
-        
-        // Pattern for doctor/customer references
-        const referenceMatch = rest.match(/^(DR\s+[A-Z\s]+|[A-Z\s]+\s+[A-Z\s]+)$/i);
-        
-        // If it's a repeated word or reference, ignore the remaining text
-        if (repeatedWordMatch || referenceMatch) {
-          rest = '';
+      for (let idx = 0; idx < rowArray.length; idx++) {
+        const value = rowArray[idx];
+        if (!value) continue;
+        let strValue = String(value).trim();
+
+        const match = strValue.match(BILL_REGEX);
+        if (match) {
+          const billNo = match[0];
+
+          // Create a copy of the row array
+          const firstItemRowArray = [...rowArray];
+
+          // Extract potential total amount before clearing the cell
+          let totalAmount = 0;
+          for (let i = 0; i < rowArray.length; i++) {
+            const cellValue = rowArray[i];
+            if (cellValue && typeof cellValue === 'number' && cellValue > 0) {
+              totalAmount = cellValue;
+              break;
+            }
+          }
+
+          // Remove billNo and handle repeated words
+          let rest = strValue.replace(billNo, '').trim();
+          if (rest) {
+            const repeatedWordMatch = rest.match(/^(\w+)\s+\1$/i);
+            const referenceMatch = rest.match(/^(DR\s+[A-Z\s]+|[A-Z\s]+\s+[A-Z\s]+)$/i);
+
+            if (repeatedWordMatch || referenceMatch) {
+              firstItemRowArray[idx] = '';  // Clear only the cell with repeated word
+            } else {
+              firstItemRowArray[idx] = rest;
+            }
+          }
+
+          return {
+            billNo,
+            firstItemRowArray,
+            totalAmount  // Add total amount to returned object
+          };
         }
       }
-      
-      // Clone rowArray and replace this cell with just the item text
-      const firstItemRowArray = [...rowArray];
-      firstItemRowArray[idx] = rest;
-      
-      return { billNo, firstItemRowArray };
+      return null;
     }
-  }
-  return null;
-}
 
     function isItemRow(rowArray) {
       let hasQuantity = false;

@@ -230,21 +230,34 @@ async function processExcelFile() {
                 if (!value)
                     continue;
                 let strValue = String(value).trim();
-                strValue = strValue.replace(/\-+\s*Mobile\s*\-+/i, '').trim();
                 const match = strValue.match(BILL_REGEX);
                 if (match) {
                     const billNo = match[0];
+                    const firstItemRowArray = [...rowArray];
+                    let totalAmount = 0;
+                    for (let i = 0; i < rowArray.length; i++) {
+                        const cellValue = rowArray[i];
+                        if (cellValue && typeof cellValue === 'number' && cellValue > 0) {
+                            totalAmount = cellValue;
+                            break;
+                        }
+                    }
                     let rest = strValue.replace(billNo, '').trim();
                     if (rest) {
                         const repeatedWordMatch = rest.match(/^(\w+)\s+\1$/i);
                         const referenceMatch = rest.match(/^(DR\s+[A-Z\s]+|[A-Z\s]+\s+[A-Z\s]+)$/i);
                         if (repeatedWordMatch || referenceMatch) {
-                            rest = '';
+                            firstItemRowArray[idx] = '';
+                        }
+                        else {
+                            firstItemRowArray[idx] = rest;
                         }
                     }
-                    const firstItemRowArray = [...rowArray];
-                    firstItemRowArray[idx] = rest;
-                    return { billNo, firstItemRowArray };
+                    return {
+                        billNo,
+                        firstItemRowArray,
+                        totalAmount
+                    };
                 }
             }
             return null;

@@ -305,32 +305,24 @@ async function processExcelFile() {
         if (match) {
           const billNo = match[0];
 
-          // Remove billNo from cell to get remaining text
-          let rest = strValue.replace(billNo, '').trim();
+          // Remove billNo and clean up the remaining text
+          let rest = strValue
+            .replace(billNo, '')
+            .replace(/LN\s+\d+/i, '')        // Remove "LN 99" pattern
+            .replace(/DR\s+[A-Z\s]+/i, '')   // Remove "DR S JAMUDA" pattern
+            .replace(/[A-Z]+\s+\d+/i, '')    // Remove other code patterns
+            .trim();
 
-          // Check for repeated words or doctor references
-          if (rest) {
-            // Pattern for repeated words (e.g., "MADHAB MADHAB")
-            const repeatedWordMatch = rest.match(/^(\w+)\s+\1$/i);
-
-            // Pattern for doctor/customer references
-            const referenceMatch = rest.match(/^(DR\s+[A-Z\s]+|[A-Z\s]+\s+[A-Z\s]+)$/i);
-
-            // If it's a repeated word or reference, ignore the remaining text
-            if (repeatedWordMatch || referenceMatch) {
-              rest = '';
-            }
-          }
-
-          // Clone rowArray and replace this cell with just the item text
+          // Clone rowArray and replace this cell with empty string (no items on bill number row)
           const firstItemRowArray = [...rowArray];
-          firstItemRowArray[idx] = rest;
+          firstItemRowArray[idx] = '';  // Clear the cell to avoid parsing extra text as items
 
           return { billNo, firstItemRowArray };
         }
       }
       return null;
     }
+
 
     function isItemRow(rowArray) {
       let hasQuantity = false;
@@ -444,45 +436,55 @@ async function processExcelFile() {
       let cash = 0;
       let credit = 0;
 
-      // First try: Look for amounts in the bill number row
-      const billIndex = rowArray.findIndex(
-        (value) => value && String(value).trim() === billNo
+      // First pass: Look for amounts in columns after the bill number
+      const billIndex = rowArray.findIndex(cell =>
+        cell && String(cell).includes(billNo)
       );
 
       if (billIndex >= 0) {
-        // Look for cash/credit values
-        for (let i = billIndex; i < rowArray.length; i++) {
+        // Look for cash/credit values in subsequent columns
+        for (let i = billIndex + 1; i < rowArray.length; i++) {
           const value = rowArray[i];
-          if (value && !isNaN(parseFloat(value))) {
-            const amount = parseFloat(value);
-            // If there's only one amount, assume it's cash
-            if (cash === 0) {
-              cash = amount;
-            } else {
-              // If we already found cash, this must be credit
-              credit = amount;
-              // If credit is negative, make it positive and subtract from cash
-              if (credit < 0) {
-                credit = Math.abs(credit);
-                cash -= credit;
-              }
-            }
+          if (!value || isNaN(parseFloat(value))) continue;
+
+          const amount = parseFloat(value);
+
+          // Skip small numbers that might be quantities
+          if (amount < 10) continue;
+
+          if (cash === 0) {
+            cash = amount;
+          } else if (amount < 0) {
+            // Negative amount is credit
+            credit = Math.abs(amount);
+            cash -= credit;
           }
         }
       }
 
-      // Second try: If no amounts found, look for "TOTAL AMOUNT" row
-      if (cash === 0 && credit === 0) {
-        const totalAmountMatch = rowArray.findIndex(cell =>
+      // Second pass: If no amounts found yet, check the bill number cell itself
+      if (cash === 0 && billIndex >= 0) {
+        const billCell = String(rowArray[billIndex]);
+        const amountMatch = billCell.match(/\s+([\d.]+)$/);
+        if (amountMatch) {
+          cash = parseFloat(amountMatch[1]);
+        }
+      }
+
+      // Third pass: Look for amounts in a nearby "TOTAL AMOUNT" row
+      if (cash === 0) {
+        const totalAmountIdx = rowArray.findIndex(cell =>
           cell && String(cell).includes('TOTAL AMOUNT')
         );
 
-        if (totalAmountMatch >= 0) {
-          // Look for amount after "TOTAL AMOUNT" text
-          for (let i = totalAmountMatch + 1; i < rowArray.length; i++) {
+        if (totalAmountIdx >= 0) {
+          for (let i = totalAmountIdx + 1; i < rowArray.length; i++) {
             const value = rowArray[i];
-            if (value && !isNaN(parseFloat(value))) {
-              cash = parseFloat(value); // Default to cash payment
+            if (!value || isNaN(parseFloat(value))) continue;
+
+            const amount = parseFloat(value);
+            if (amount >= 10) {  // Skip small numbers
+              cash = amount;
               break;
             }
           }

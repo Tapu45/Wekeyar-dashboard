@@ -234,16 +234,14 @@ async function processExcelFile() {
                 const match = strValue.match(BILL_REGEX);
                 if (match) {
                     const billNo = match[0];
-                    let rest = strValue.replace(billNo, '').trim();
-                    if (rest) {
-                        const repeatedWordMatch = rest.match(/^(\w+)\s+\1$/i);
-                        const referenceMatch = rest.match(/^(DR\s+[A-Z\s]+|[A-Z\s]+\s+[A-Z\s]+)$/i);
-                        if (repeatedWordMatch || referenceMatch) {
-                            rest = '';
-                        }
-                    }
+                    let rest = strValue
+                        .replace(billNo, '')
+                        .replace(/LN\s+\d+/i, '')
+                        .replace(/DR\s+[A-Z\s]+/i, '')
+                        .replace(/[A-Z]+\s+\d+/i, '')
+                        .trim();
                     const firstItemRowArray = [...rowArray];
-                    firstItemRowArray[idx] = rest;
+                    firstItemRowArray[idx] = '';
                     return { billNo, firstItemRowArray };
                 }
             }
@@ -336,32 +334,41 @@ async function processExcelFile() {
         function extractCashAndCredit(rowArray, billNo) {
             let cash = 0;
             let credit = 0;
-            const billIndex = rowArray.findIndex((value) => value && String(value).trim() === billNo);
+            const billIndex = rowArray.findIndex(cell => cell && String(cell).includes(billNo));
             if (billIndex >= 0) {
-                for (let i = billIndex; i < rowArray.length; i++) {
+                for (let i = billIndex + 1; i < rowArray.length; i++) {
                     const value = rowArray[i];
-                    if (value && !isNaN(parseFloat(value))) {
-                        const amount = parseFloat(value);
-                        if (cash === 0) {
-                            cash = amount;
-                        }
-                        else {
-                            credit = amount;
-                            if (credit < 0) {
-                                credit = Math.abs(credit);
-                                cash -= credit;
-                            }
-                        }
+                    if (!value || isNaN(parseFloat(value)))
+                        continue;
+                    const amount = parseFloat(value);
+                    if (amount < 10)
+                        continue;
+                    if (cash === 0) {
+                        cash = amount;
+                    }
+                    else if (amount < 0) {
+                        credit = Math.abs(amount);
+                        cash -= credit;
                     }
                 }
             }
-            if (cash === 0 && credit === 0) {
-                const totalAmountMatch = rowArray.findIndex(cell => cell && String(cell).includes('TOTAL AMOUNT'));
-                if (totalAmountMatch >= 0) {
-                    for (let i = totalAmountMatch + 1; i < rowArray.length; i++) {
+            if (cash === 0 && billIndex >= 0) {
+                const billCell = String(rowArray[billIndex]);
+                const amountMatch = billCell.match(/\s+([\d.]+)$/);
+                if (amountMatch) {
+                    cash = parseFloat(amountMatch[1]);
+                }
+            }
+            if (cash === 0) {
+                const totalAmountIdx = rowArray.findIndex(cell => cell && String(cell).includes('TOTAL AMOUNT'));
+                if (totalAmountIdx >= 0) {
+                    for (let i = totalAmountIdx + 1; i < rowArray.length; i++) {
                         const value = rowArray[i];
-                        if (value && !isNaN(parseFloat(value))) {
-                            cash = parseFloat(value);
+                        if (!value || isNaN(parseFloat(value)))
+                            continue;
+                        const amount = parseFloat(value);
+                        if (amount >= 10) {
+                            cash = amount;
                             break;
                         }
                     }

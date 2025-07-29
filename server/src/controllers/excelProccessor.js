@@ -293,25 +293,44 @@ async function processExcelFile() {
     }
 
     function extractBillNumberAndFirstItem(rowArray) {
-      for (let idx = 0; idx < rowArray.length; idx++) {
-        const value = rowArray[idx];
-        if (!value) continue;
-        let strValue = String(value).trim();
-        // Remove any trailing '- Mobile -' or similar text
-        strValue = strValue.replace(/\-+\s*Mobile\s*\-+/i, '').trim();
-        const match = strValue.match(BILL_REGEX);
-        if (match) {
-          const billNo = match[0];
-          // Remove billNo from cell to get first item text
-          const rest = strValue.replace(billNo, '').trim();
-          // Clone rowArray and replace this cell with just the item text
-          const firstItemRowArray = [...rowArray];
-          firstItemRowArray[idx] = rest;
-          return { billNo, firstItemRowArray };
+  for (let idx = 0; idx < rowArray.length; idx++) {
+    const value = rowArray[idx];
+    if (!value) continue;
+    let strValue = String(value).trim();
+    
+    // Remove any trailing '- Mobile -' or similar text
+    strValue = strValue.replace(/\-+\s*Mobile\s*\-+/i, '').trim();
+    
+    const match = strValue.match(BILL_REGEX);
+    if (match) {
+      const billNo = match[0];
+      
+      // Remove billNo from cell to get remaining text
+      let rest = strValue.replace(billNo, '').trim();
+      
+      // Check for repeated words or doctor references
+      if (rest) {
+        // Pattern for repeated words (e.g., "MADHAB MADHAB")
+        const repeatedWordMatch = rest.match(/^(\w+)\s+\1$/i);
+        
+        // Pattern for doctor/customer references
+        const referenceMatch = rest.match(/^(DR\s+[A-Z\s]+|[A-Z\s]+\s+[A-Z\s]+)$/i);
+        
+        // If it's a repeated word or reference, ignore the remaining text
+        if (repeatedWordMatch || referenceMatch) {
+          rest = '';
         }
       }
-      return null;
+      
+      // Clone rowArray and replace this cell with just the item text
+      const firstItemRowArray = [...rowArray];
+      firstItemRowArray[idx] = rest;
+      
+      return { billNo, firstItemRowArray };
     }
+  }
+  return null;
+}
 
     function isItemRow(rowArray) {
       let hasQuantity = false;

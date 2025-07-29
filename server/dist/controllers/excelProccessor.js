@@ -234,7 +234,14 @@ async function processExcelFile() {
                 const match = strValue.match(BILL_REGEX);
                 if (match) {
                     const billNo = match[0];
-                    const rest = strValue.replace(billNo, '').trim();
+                    let rest = strValue.replace(billNo, '').trim();
+                    if (rest) {
+                        const repeatedWordMatch = rest.match(/^(\w+)\s+\1$/i);
+                        const referenceMatch = rest.match(/^(DR\s+[A-Z\s]+|[A-Z\s]+\s+[A-Z\s]+)$/i);
+                        if (repeatedWordMatch || referenceMatch) {
+                            rest = '';
+                        }
+                    }
                     const firstItemRowArray = [...rowArray];
                     firstItemRowArray[idx] = rest;
                     return { billNo, firstItemRowArray };

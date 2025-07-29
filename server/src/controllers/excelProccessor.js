@@ -442,19 +442,18 @@ async function processExcelFile() {
       );
 
       if (billIndex >= 0) {
-        // Sum all numbers after the bill number cell
+        // Only add positive numbers to cash, negative to credit
         for (let i = billIndex + 1; i < rowArray.length; i++) {
           const value = rowArray[i];
           if (!value || isNaN(parseFloat(value))) continue;
 
           const amount = parseFloat(value);
 
-          // If negative, treat as credit
           if (amount < 0) {
             credit += Math.abs(amount);
+          } else if (amount > 0) {
+            cash += amount;
           }
-          // Add all values (positive or negative) to cash
-          cash += amount;
         }
       }
 
@@ -463,7 +462,12 @@ async function processExcelFile() {
         const billCell = String(rowArray[billIndex]);
         const amountMatch = billCell.match(/\s+([\d.\-]+)/);
         if (amountMatch) {
-          cash = parseFloat(amountMatch[1]);
+          const amount = parseFloat(amountMatch[1]);
+          if (amount < 0) {
+            credit += Math.abs(amount);
+          } else if (amount > 0) {
+            cash += amount;
+          }
         }
       }
 
@@ -479,8 +483,11 @@ async function processExcelFile() {
             if (!value || isNaN(parseFloat(value))) continue;
 
             const amount = parseFloat(value);
-            cash += amount;
-            if (amount < 0) credit += Math.abs(amount);
+            if (amount < 0) {
+              credit += Math.abs(amount);
+            } else if (amount > 0) {
+              cash += amount;
+            }
           }
         }
       }

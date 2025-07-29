@@ -344,14 +344,22 @@ async function processExcelFile() {
                     if (amount < 0) {
                         credit += Math.abs(amount);
                     }
-                    cash += amount;
+                    else if (amount > 0) {
+                        cash += amount;
+                    }
                 }
             }
             if (cash === 0 && billIndex >= 0) {
                 const billCell = String(rowArray[billIndex]);
                 const amountMatch = billCell.match(/\s+([\d.\-]+)/);
                 if (amountMatch) {
-                    cash = parseFloat(amountMatch[1]);
+                    const amount = parseFloat(amountMatch[1]);
+                    if (amount < 0) {
+                        credit += Math.abs(amount);
+                    }
+                    else if (amount > 0) {
+                        cash += amount;
+                    }
                 }
             }
             if (cash === 0) {
@@ -362,9 +370,12 @@ async function processExcelFile() {
                         if (!value || isNaN(parseFloat(value)))
                             continue;
                         const amount = parseFloat(value);
-                        cash += amount;
-                        if (amount < 0)
+                        if (amount < 0) {
                             credit += Math.abs(amount);
+                        }
+                        else if (amount > 0) {
+                            cash += amount;
+                        }
                     }
                 }
             }

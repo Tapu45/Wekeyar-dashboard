@@ -230,34 +230,21 @@ async function processExcelFile() {
                 if (!value)
                     continue;
                 let strValue = String(value).trim();
+                strValue = strValue.replace(/\-+\s*Mobile\s*\-+/i, '').trim();
                 const match = strValue.match(BILL_REGEX);
                 if (match) {
                     const billNo = match[0];
-                    const firstItemRowArray = [...rowArray];
-                    let totalAmount = 0;
-                    for (let i = 0; i < rowArray.length; i++) {
-                        const cellValue = rowArray[i];
-                        if (cellValue && typeof cellValue === 'number' && cellValue > 0) {
-                            totalAmount = cellValue;
-                            break;
-                        }
-                    }
                     let rest = strValue.replace(billNo, '').trim();
                     if (rest) {
                         const repeatedWordMatch = rest.match(/^(\w+)\s+\1$/i);
                         const referenceMatch = rest.match(/^(DR\s+[A-Z\s]+|[A-Z\s]+\s+[A-Z\s]+)$/i);
                         if (repeatedWordMatch || referenceMatch) {
-                            firstItemRowArray[idx] = '';
-                        }
-                        else {
-                            firstItemRowArray[idx] = rest;
+                            rest = '';
                         }
                     }
-                    return {
-                        billNo,
-                        firstItemRowArray,
-                        totalAmount
-                    };
+                    const firstItemRowArray = [...rowArray];
+                    firstItemRowArray[idx] = rest;
+                    return { billNo, firstItemRowArray };
                 }
             }
             return null;
@@ -351,16 +338,32 @@ async function processExcelFile() {
             let credit = 0;
             const billIndex = rowArray.findIndex((value) => value && String(value).trim() === billNo);
             if (billIndex >= 0) {
-                if (rowArray.length >= billIndex + 3) {
-                    const cashValue = rowArray[rowArray.length - 2];
-                    const creditValue = rowArray[rowArray.length - 1];
-                    if (cashValue && !isNaN(parseFloat(cashValue))) {
-                        cash = parseFloat(cashValue);
+                for (let i = billIndex; i < rowArray.length; i++) {
+                    const value = rowArray[i];
+                    if (value && !isNaN(parseFloat(value))) {
+                        const amount = parseFloat(value);
+                        if (cash === 0) {
+                            cash = amount;
+                        }
+                        else {
+                            credit = amount;
+                            if (credit < 0) {
+                                credit = Math.abs(credit);
+                                cash -= credit;
+                            }
+                        }
                     }
-                    if (creditValue && !isNaN(parseFloat(creditValue))) {
-                        credit = parseFloat(creditValue);
-                        if (credit < 0)
-                            credit = Math.abs(credit);
+                }
+            }
+            if (cash === 0 && credit === 0) {
+                const totalAmountMatch = rowArray.findIndex(cell => cell && String(cell).includes('TOTAL AMOUNT'));
+                if (totalAmountMatch >= 0) {
+                    for (let i = totalAmountMatch + 1; i < rowArray.length; i++) {
+                        const value = rowArray[i];
+                        if (value && !isNaN(parseFloat(value))) {
+                            cash = parseFloat(value);
+                            break;
+                        }
                     }
                 }
             }

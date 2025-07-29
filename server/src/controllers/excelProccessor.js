@@ -298,41 +298,35 @@ async function processExcelFile() {
         if (!value) continue;
         let strValue = String(value).trim();
 
+        // Remove any trailing '- Mobile -' or similar text
+        strValue = strValue.replace(/\-+\s*Mobile\s*\-+/i, '').trim();
+
         const match = strValue.match(BILL_REGEX);
         if (match) {
           const billNo = match[0];
 
-          // Create a copy of the row array
-          const firstItemRowArray = [...rowArray];
-
-          // Extract potential total amount before clearing the cell
-          let totalAmount = 0;
-          for (let i = 0; i < rowArray.length; i++) {
-            const cellValue = rowArray[i];
-            if (cellValue && typeof cellValue === 'number' && cellValue > 0) {
-              totalAmount = cellValue;
-              break;
-            }
-          }
-
-          // Remove billNo and handle repeated words
+          // Remove billNo from cell to get remaining text
           let rest = strValue.replace(billNo, '').trim();
+
+          // Check for repeated words or doctor references
           if (rest) {
+            // Pattern for repeated words (e.g., "MADHAB MADHAB")
             const repeatedWordMatch = rest.match(/^(\w+)\s+\1$/i);
+
+            // Pattern for doctor/customer references
             const referenceMatch = rest.match(/^(DR\s+[A-Z\s]+|[A-Z\s]+\s+[A-Z\s]+)$/i);
 
+            // If it's a repeated word or reference, ignore the remaining text
             if (repeatedWordMatch || referenceMatch) {
-              firstItemRowArray[idx] = '';  // Clear only the cell with repeated word
-            } else {
-              firstItemRowArray[idx] = rest;
+              rest = '';
             }
           }
 
-          return {
-            billNo,
-            firstItemRowArray,
-            totalAmount  // Add total amount to returned object
-          };
+          // Clone rowArray and replace this cell with just the item text
+          const firstItemRowArray = [...rowArray];
+          firstItemRowArray[idx] = rest;
+
+          return { billNo, firstItemRowArray };
         }
       }
       return null;
@@ -450,26 +444,47 @@ async function processExcelFile() {
       let cash = 0;
       let credit = 0;
 
-      // Check if this row contains the bill number
+      // First try: Look for amounts in the bill number row
       const billIndex = rowArray.findIndex(
         (value) => value && String(value).trim() === billNo
       );
 
       if (billIndex >= 0) {
-        // Cash is typically the second-to-last column
-        // Credit is typically the last column
-        if (rowArray.length >= billIndex + 3) {
-          const cashValue = rowArray[rowArray.length - 2];
-          const creditValue = rowArray[rowArray.length - 1];
-
-          if (cashValue && !isNaN(parseFloat(cashValue))) {
-            cash = parseFloat(cashValue);
+        // Look for cash/credit values
+        for (let i = billIndex; i < rowArray.length; i++) {
+          const value = rowArray[i];
+          if (value && !isNaN(parseFloat(value))) {
+            const amount = parseFloat(value);
+            // If there's only one amount, assume it's cash
+            if (cash === 0) {
+              cash = amount;
+            } else {
+              // If we already found cash, this must be credit
+              credit = amount;
+              // If credit is negative, make it positive and subtract from cash
+              if (credit < 0) {
+                credit = Math.abs(credit);
+                cash -= credit;
+              }
+            }
           }
+        }
+      }
 
-          if (creditValue && !isNaN(parseFloat(creditValue))) {
-            credit = parseFloat(creditValue);
-            // Handle negative credit values
-            if (credit < 0) credit = Math.abs(credit);
+      // Second try: If no amounts found, look for "TOTAL AMOUNT" row
+      if (cash === 0 && credit === 0) {
+        const totalAmountMatch = rowArray.findIndex(cell =>
+          cell && String(cell).includes('TOTAL AMOUNT')
+        );
+
+        if (totalAmountMatch >= 0) {
+          // Look for amount after "TOTAL AMOUNT" text
+          for (let i = totalAmountMatch + 1; i < rowArray.length; i++) {
+            const value = rowArray[i];
+            if (value && !isNaN(parseFloat(value))) {
+              cash = parseFloat(value); // Default to cash payment
+              break;
+            }
           }
         }
       }

@@ -90,7 +90,7 @@ async function clearStoreDataByName(storeName) {
 }
 async function main() {
     try {
-        const result = await clearStoreDataByName("KALINGA VIHAR");
+        const result = await clearStoreDataByName("RUCHIKA");
         console.log(result);
     }
     catch (error) {

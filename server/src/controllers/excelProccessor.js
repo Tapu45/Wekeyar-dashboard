@@ -780,19 +780,29 @@ async function processExcelFile() {
         await executeWithRetry(async () => {
           return prisma.bill.findMany({
             where: {
-              billNo: {
-                in: validBillRecords.map((bill) => bill.billNo),
-              },
+              AND: [
+                {
+                  billNo: {
+                    in: validBillRecords.map((bill) => bill.billNo),
+                  },
+                },
+                {
+                  storeId: storeId, // Include storeId in the where clause
+                },
+              ],
             },
-            select: { billNo: true },
+            select: {
+              billNo: true,
+              storeId: true
+            },
           });
         })
-      ).map((bill) => bill.billNo)
+      ).map((bill) => `${bill.billNo}-${bill.storeId}`) // Create composite key
     );
 
-    // Filter out existing bills
+    // Filter out existing bills using composite key
     const newBills = validBillRecords.filter(
-      (bill) => !existingBillNos.has(bill.billNo)
+      (bill) => !existingBillNos.has(`${bill.billNo}-${storeId}`)
     );
     console.log(
       `Processing ${newBills.length} new bills (${existingBillNos.size} already exist)`

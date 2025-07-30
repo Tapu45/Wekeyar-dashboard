@@ -378,7 +378,12 @@ async function postDailyBills(req, res) {
                     };
                 });
                 const existingBill = await prisma.bill.findUnique({
-                    where: { billNo: billData.billNo }
+                    where: {
+                        billNo_storeId: {
+                            billNo: billData.billNo,
+                            storeId: store.id
+                        }
+                    }
                 });
                 if (existingBill) {
                     console.error(`Bill with number ${billData.billNo} already exists`);

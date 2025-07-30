@@ -22,7 +22,7 @@ router.get("/customer-report", getCustomerReport);
 router.get("/store-sales-report", getStoreWiseSalesReport);
 router.get("/customers", getAllCustomers);
 router.get("/inactive-customers", getInactiveCustomers);
-router.get("/bills/:billNo", getBillDetailsByBillNo);
+router.get("/bills/:billNo/:storeId", getBillDetailsByBillNo);
 router.get("/upload-status", getUploadStatusByMonth);
 router.get("/stores", getStores);
 

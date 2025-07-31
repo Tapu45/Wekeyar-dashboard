@@ -450,6 +450,12 @@ async function processExcelFile() {
           if (!value || isNaN(parseFloat(value))) continue;
 
           const amount = parseFloat(value);
+           const strValue = String(value).trim();
+
+          // Skip phone numbers (10 digits)
+          if (strValue.length === 10 && /^\d{10}$/.test(strValue)) {
+            continue;
+          }
 
           if (amount < 0) {
             credit += Math.abs(amount);

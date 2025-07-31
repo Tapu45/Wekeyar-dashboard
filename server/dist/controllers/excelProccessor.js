@@ -110,6 +110,8 @@ async function processExcelFile() {
             const rowString = rowValueArray.join(" ");
             const STORE_NAME_MAPPINGS = {
                 'IRC VILAGE': 'IRC VILLAGE',
+                'MAUSIMAA SQUARE': 'MOUSIMAA',
+                'MAUSIMAA': 'MOUSIMAA'
             };
             if (!storeInfo.name) {
                 for (const store of KNOWN_STORES) {

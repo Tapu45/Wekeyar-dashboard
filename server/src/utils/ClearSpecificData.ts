@@ -113,7 +113,7 @@ export async function clearStoreDataByName(storeName: string): Promise<ClearStor
 
 async function main() {
   try {
-    const result = await clearStoreDataByName("RUCHIKA");
+    const result = await clearStoreDataByName("UNKNOWN STORE");
     console.log(result);
   } catch (error) {
     console.error(error);

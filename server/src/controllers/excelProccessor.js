@@ -145,6 +145,8 @@ async function processExcelFile() {
 
       const STORE_NAME_MAPPINGS = {
         'IRC VILAGE': 'IRC VILLAGE',
+        'MAUSIMAA SQUARE': 'MOUSIMAA',    // Add this mapping
+        'MAUSIMAA': 'MOUSIMAA'
         // Add more mappings if needed
       };
 

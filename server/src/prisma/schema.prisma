@@ -33,7 +33,7 @@ model Store {
 
 model Bill {
   id           Int           @id @default(autoincrement())
-  billNo       String        @unique
+  billNo       String        
   customerId   Int
   storeId      Int
   date         DateTime      @default(now())
@@ -48,6 +48,8 @@ model Bill {
   customer     Customer      @relation(fields: [customerId], references: [id])
   store        Store         @relation(fields: [storeId], references: [id])
   billDetails  BillDetails[]
+
+  @@unique([billNo, storeId])
 }
 
 model BillDetails {

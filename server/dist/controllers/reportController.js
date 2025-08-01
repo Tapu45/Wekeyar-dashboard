@@ -551,13 +551,13 @@ const getCustomerPurchaseHistory = async (req, res) => {
 exports.getCustomerPurchaseHistory = getCustomerPurchaseHistory;
 const getBillDetailsByBillNo = async (req, res) => {
     try {
-        const { billNo } = req.params;
-        if (!billNo) {
-            res.status(400).json({ error: "Bill number is required" });
+        const { billNo, storeId } = req.params;
+        if (!billNo || !storeId) {
+            res.status(400).json({ error: "Bill number and store ID are required" });
             return;
         }
         const bill = await exports.prisma.bill.findUnique({
-            where: { billNo },
+            where: { billNo_storeId: { billNo, storeId: Number(storeId) } },
             include: {
                 customer: true,
                 store: true,

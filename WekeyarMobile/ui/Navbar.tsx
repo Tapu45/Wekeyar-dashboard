@@ -7,6 +7,7 @@ import {
   Animated,
   Dimensions,
   SafeAreaView,
+  ScrollView,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -17,6 +18,8 @@ type RootStackParamList = {
   Dashboard: undefined;
   InactiveCustomerList: any;
   CustomerReport: undefined;
+  StoreReport: undefined;
+  UserCreation: undefined;
 };
 
 type NavItem = {
@@ -41,9 +44,21 @@ const navItems: NavItem[] = [
   },
   {
     name: 'CustomerReport',
-    title: 'Reports',
+    title: 'Customers',
     icon: '📈',
     color: '#059669',
+  },
+  {
+    name: 'StoreReport',
+    title: 'Stores',
+    icon: '🏪',
+    color: '#dc2626',
+  },
+  {
+    name: 'UserCreation',
+    title: 'Users',
+    icon: '👤',
+    color: '#ea580c',
   },
 ];
 
@@ -112,9 +127,10 @@ const CustomNavbar: React.FC = () => {
     }
   };
 
+  const itemWidth = width / navItems.length;
   const indicatorTranslateX = activeIndicatorAnim.interpolate({
-    inputRange: [0, 1, 2],
-    outputRange: [0, width / 3, (2 * width) / 3],
+    inputRange: navItems.map((_, index) => index),
+    outputRange: navItems.map((_, index) => index * itemWidth),
   });
 
   return (
@@ -136,63 +152,70 @@ const CustomNavbar: React.FC = () => {
           style={[
             styles.activeIndicator,
             {
+              width: itemWidth,
               transform: [{ translateX: indicatorTranslateX }],
             },
           ]}
         />
 
-        {/* Navigation Items */}
-        {navItems.map((item, index) => {
-          const isActive = route.name === item.name;
-          
-          return (
-            <TouchableOpacity
-              key={item.name}
-              style={styles.navItem}
-              onPress={() => handleNavigation(item.name)}
-              activeOpacity={0.7}
-            >
-              <Animated.View
-                style={[
-                  styles.navItemContent,
-                  isActive && styles.activeNavItem,
-                  isActive && { transform: [{ scale: pulseAnim }] }
-                ]}
+        {/* Navigation Items - Scrollable for 5 items */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.navContainer}
+        >
+          {navItems.map((item, index) => {
+            const isActive = route.name === item.name;
+            
+            return (
+              <TouchableOpacity
+                key={item.name}
+                style={[styles.navItem, { width: itemWidth }]}
+                onPress={() => handleNavigation(item.name)}
+                activeOpacity={0.7}
               >
-                <View style={[
-                  styles.iconContainer,
-                  isActive && { backgroundColor: item.color }
-                ]}>
-                  <Text style={[
-                    styles.icon,
-                    isActive && styles.activeIcon
-                  ]}>
-                    {item.icon}
-                  </Text>
-                </View>
-                <Text style={[
-                  styles.navTitle,
-                  isActive && { color: item.color, fontWeight: '700' }
-                ]}>
-                  {item.title}
-                </Text>
-              </Animated.View>
-              
-              {/* Glow Effect for Active Item */}
-              {isActive && (
-                <Animated.View 
+                <Animated.View
                   style={[
-                    styles.glowEffect,
-                    { 
-                      backgroundColor: item.color,
-                      transform: [{ scale: pulseAnim }]
-                    }
+                    styles.navItemContent,
+                    isActive && styles.activeNavItem,
+                    isActive && { transform: [{ scale: pulseAnim }] }
                   ]}
-                />
-              )}
-            </TouchableOpacity>
-          );
-        })}
+                >
+                  <View style={[
+                    styles.iconContainer,
+                    isActive && { backgroundColor: item.color }
+                  ]}>
+                    <Text style={[
+                      styles.icon,
+                      isActive && styles.activeIcon
+                    ]}>
+                      {item.icon}
+                    </Text>
+                  </View>
+                  <Text style={[
+                    styles.navTitle,
+                    isActive && { color: item.color, fontWeight: '700' }
+                  ]}>
+                    {item.title}
+                  </Text>
+                </Animated.View>
+                
+                {/* Glow Effect for Active Item */}
+                {isActive && (
+                  <Animated.View 
+                    style={[
+                      styles.glowEffect,
+                      { 
+                        backgroundColor: item.color,
+                        transform: [{ scale: pulseAnim }]
+                      }
+                    ]}
+                  />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
 
         {/* Floating Decorative Elements */}
         <Animated.View 
@@ -215,9 +238,6 @@ const styles = StyleSheet.create({
   navbar: {
     height: 80,
     backgroundColor: '#ffffff',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
     shadowColor: '#2563eb',
@@ -231,6 +251,12 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
+  navContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    height: '100%',
+  },
   backgroundGradient: {
     position: 'absolute',
     top: 0,
@@ -242,13 +268,11 @@ const styles = StyleSheet.create({
   activeIndicator: {
     position: 'absolute',
     top: 0,
-    width: width / 3,
     height: 4,
     backgroundColor: '#fbbf24',
     borderRadius: 2,
   },
   navItem: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
@@ -258,7 +282,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 4,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     borderRadius: 16,
     minHeight: 60,
   },
@@ -266,22 +290,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(37, 99, 235, 0.1)',
   },
   iconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
     backgroundColor: '#f8fafc',
   },
   icon: {
-    fontSize: 16,
+    fontSize: 14,
   },
   activeIcon: {
-    fontSize: 18,
+    fontSize: 16,
   },
   navTitle: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#64748b',
     fontWeight: '600',
     textAlign: 'center',
@@ -290,20 +314,20 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     opacity: 0.1,
-    transform: [{ translateX: -30 }, { translateY: -30 }],
+    transform: [{ translateX: -25 }, { translateY: -25 }],
   },
   floatingElement: {
     position: 'absolute',
     top: 10,
     right: 30,
-    width: 8,
-    height: 8,
+    width: 6,
+    height: 6,
     backgroundColor: '#60a5fa',
-    borderRadius: 4,
+    borderRadius: 3,
     opacity: 0.3,
   },
 });

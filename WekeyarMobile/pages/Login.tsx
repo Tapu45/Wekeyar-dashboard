@@ -16,6 +16,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import api, { API_ROUTES } from '../utils/api';
+import { AuthStorage } from '../utils/AuthStorage';
 
 type RootStackParamList = {
   Dashboard: undefined;
@@ -153,54 +154,60 @@ const Login: React.FC<Props> = () => {
   }, [isLoading]);
 
   const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in both username and password');
-      return;
-    }
+  if (!username.trim() || !password.trim()) {
+    Alert.alert('Error', 'Please fill in both username and password');
+    return;
+  }
 
-    setIsLoading(true);
+  setIsLoading(true);
 
-    // Button press animation
-    Animated.sequence([
-      Animated.timing(buttonScaleAnim, {
-        toValue: 0.95,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonScaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  // Button press animation
+  Animated.sequence([
+    Animated.timing(buttonScaleAnim, {
+      toValue: 0.95,
+      duration: 100,
+      useNativeDriver: true,
+    }),
+    Animated.timing(buttonScaleAnim, {
+      toValue: 1,
+      duration: 100,
+      useNativeDriver: true,
+    }),
+  ]).start();
 
-    try {
-      const response = await api.post(API_ROUTES.LOGIN, {
-        username,
-        password,
+  try {
+    const response = await api.post(API_ROUTES.LOGIN, {
+      username,
+      password,
+    });
+
+    if (response.status === 200) {
+      // Save authentication data
+      const token = response.data.token || 'mock_token'; // Use actual token from response
+      const userData = response.data.user || { username, role: 'telecaller' };
+      
+      await AuthStorage.saveAuthData(token, userData);
+
+      // Success animation
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        navigation.navigate('Dashboard');
       });
-
-      if (response.status === 200) {
-        // Success animation
-        Animated.sequence([
-          Animated.timing(fadeAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
-          navigation.navigate('Dashboard');
-        });
-      } else {
-        setIsLoading(false);
-        Alert.alert('Login Failed', 'Invalid username or password');
-      }
-    } catch (error) {
+    } else {
       setIsLoading(false);
-      console.error('Login error:', error);
-      Alert.alert('Login Failed', 'An error occurred while logging in');
+      Alert.alert('Login Failed', 'Invalid username or password');
     }
-  };
+  } catch (error) {
+    setIsLoading(false);
+    console.error('Login error:', error);
+    Alert.alert('Login Failed', 'An error occurred while logging in');
+  }
+};
 
   const handleInputFocus = (inputName: string) => {
     setFocusedInput(inputName);

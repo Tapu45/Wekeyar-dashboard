@@ -267,3 +267,96 @@ export const exportNonBuyingToExcel = (data: NonBuyingCustomer[], filters?: {
   XLSX.writeFile(workbook, filename);
 };
 
+// Add this interface at the top with other interfaces
+interface StoreReport {
+  storeName: string;
+  address: string;
+  salesData: {
+    totalBills: number;
+    totalNetAmount: number;
+    totalItemsSold: number;
+    isUploaded: boolean;
+  };
+  trends: {
+    previousDay: { totalNetAmount: number };
+    currentMonth: { totalNetAmount: number };
+  };
+}
+
+// Add this new export function
+export const exportStoreReportToExcel = (data: StoreReport[], selectedDate: string) => {
+  if (!data || data.length === 0) {
+    alert("No data available to export.");
+    return;
+  }
+
+  // Create workbook
+  const workbook = XLSX.utils.book_new();
+  
+  // Prepare header data
+  const headerData = [
+    ["STORE-WISE SALES REPORT"],
+    [""],
+    ["Report Generated:", new Date().toLocaleString('en-IN')],
+    ["Report Date:", selectedDate],
+    ["Total Stores:", data.length.toString()],
+    [""],
+    [""] // Extra empty row before store data begins
+  ];
+  
+  // Add column headers
+  const columnHeaders = [
+    [
+      "Store Name",
+      "Address",
+      "Total Bills",
+      "Total Amount",
+      "Total Items",
+      "Upload Status",
+      "Previous Day Amount",
+      "Current Month Amount"
+    ]
+  ];
+  
+  // Format store data
+  const storeData = data.map((store) => [
+    store.storeName,
+    store.address,
+    store.salesData.totalBills,
+    store.salesData.totalNetAmount,
+    store.salesData.totalItemsSold,
+    store.salesData.isUploaded ? "Uploaded" : "Not Uploaded",
+    store.trends.previousDay.totalNetAmount,
+    store.trends.currentMonth.totalNetAmount
+  ]);
+  
+  // Combine all data
+  const allData = [...headerData, ...columnHeaders, ...storeData];
+  
+  // Create the worksheet
+  const ws = XLSX.utils.aoa_to_sheet(allData);
+  
+  // Set column widths
+  ws['!cols'] = [
+    { wch: 25 }, // Store Name
+    { wch: 30 }, // Address
+    { wch: 12 }, // Total Bills
+    { wch: 15 }, // Total Amount
+    { wch: 12 }, // Total Items
+    { wch: 15 }, // Upload Status
+    { wch: 18 }, // Previous Day Amount
+    { wch: 18 }  // Current Month Amount
+  ];
+  
+  // Merge cells for the title
+  if(!ws['!merges']) ws['!merges'] = [];
+  ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } });
+  
+  // Add the worksheet to the workbook
+  XLSX.utils.book_append_sheet(workbook, ws, "Store Sales Report");
+
+  // Write file
+  const filename = `StoreSalesReport_${selectedDate}.xlsx`;
+  XLSX.writeFile(workbook, filename);
+};
+

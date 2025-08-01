@@ -32,6 +32,7 @@ async function postDailyBills(req, res) {
             "RUCHIKA",
             "WEKEYAR PLUS",
             "MAUSIMAA SQUARE",
+            "MOUSIMAA",
             "DUMDUMA",
             "SUM HOSPITAL",
             "SAMANTARAPUR",
@@ -378,7 +379,12 @@ async function postDailyBills(req, res) {
                     };
                 });
                 const existingBill = await prisma.bill.findUnique({
-                    where: { billNo: billData.billNo }
+                    where: {
+                        billNo_storeId: {
+                            billNo: billData.billNo,
+                            storeId: store.id
+                        }
+                    }
                 });
                 if (existingBill) {
                     PrintLog_1.logger.error(`Bill with number ${billData.billNo} already exists`);

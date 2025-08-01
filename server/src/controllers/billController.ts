@@ -44,6 +44,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
       "RUCHIKA",
       "WEKEYAR PLUS",
       "MAUSIMAA SQUARE",
+      "MOUSIMAA",
       "DUMDUMA",
       "SUM HOSPITAL",
       "SAMANTARAPUR",
@@ -401,7 +402,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
 
 
         // Debug log the extracted bill data
-        console.log(`"Extracted bill data:",${JSON.stringify(billData, null, 2)}`);
+        console.log("Extracted bill data:", JSON.stringify(billData, null, 2));
 
         // Validation - Skip bills with invalid data
         if (!billData.billNo || !billData.date || isNaN(billData.date.getTime())) {
@@ -524,12 +525,17 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
 
         // Check if bill already exists
         const existingBill = await prisma.bill.findUnique({
-          where: { billNo: billData.billNo }
+          where: {
+            billNo_storeId: {
+              billNo: billData.billNo,
+              storeId: store.id
+            }
+          }
         });
 
         if (existingBill) {
           // Skip bills that already exist
-          logger.error(`Bill with number ${billData.billNo} already exists`);
+          console.error(`Bill with number ${billData.billNo} already exists`);
           return res.status(200).json({ success: true });
         }
 
@@ -587,8 +593,8 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
       });
     } else if (failedBills.length > 0) {
       failedBills.map((bill) => {
-        logger.error(`Failed bill: ${bill.error}`);
-        logger.error(`Failed bill logic check:", ${bill.error.includes("already exists")}`);
+        console.log("Failed bill:", bill.error);
+        console.log("Failed bill:", bill.error.includes("already exists"));
       })
       const allMissingEssentialInfo = failedBills.every(bill =>
         bill.error === "Missing essential bill information (bill number or date)" ||
@@ -616,7 +622,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
       });
     }
   } catch (error) {
-    logger.error(`Error in postDailyBills: ${error}`);
+    console.error("Error in postDailyBills:", error);
     return res.status(500).json({
       error: "Failed to process bills",
       details: error instanceof Error ? error.message : "Unknown error"

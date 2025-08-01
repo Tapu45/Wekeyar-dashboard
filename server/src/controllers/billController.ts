@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
+import { logger } from "./lib/PrintLog";
 
 export async function postDailyBills(req: Request, res: Response): Promise<Response> {
   const prisma = new PrismaClient();
@@ -9,7 +10,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
 
     // validate body
     if (!bill) {
-      console.log("Invalid request body", bill);
+      logger.error("Invalid request body", bill);
       return res.status(400).json({ error: "Invalid request body" });
     }
 
@@ -405,7 +406,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
 
         // Validation - Skip bills with invalid data
         if (!billData.billNo || !billData.date || isNaN(billData.date.getTime())) {
-          console.error("Invalid bill data:", billData);
+          logger.error(`Invalid bill data: ${billData}`);
           failedBills.push({
             error: "Missing essential bill information (bill number or date)",
             billText: billText.substring(0, 100) + "..."
@@ -571,7 +572,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
 
       } catch (error) {
         // Log the error and add to failed bills
-        console.error("Error processing bill:", error);
+        logger.error(`Error processing bill:${error}`);
         failedBills.push({
           error: error instanceof Error ? error.message : "Unknown error",
           billText: billText.substring(0, 100) + "..." // Include part of the bill text for debugging

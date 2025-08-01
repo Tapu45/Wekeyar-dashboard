@@ -14,12 +14,12 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
       return res.status(400).json({ error: "Invalid request body" });
     }
 
-    logger.info("Processing bill input");
-    logger.info(bill); // Log the start of the bill for debugging
+    console.log("Processing bill input");
+    console.log(bill); // Log the start of the bill for debugging
     if (bill.includes("Weekly Sale Report") ||
       (bill.includes("TOTAL NET SALE") && bill.includes("TOTAL COLLECTION")) ||
       (bill.includes("SALE") && bill.includes("RETURN") && bill.includes("NET SALE") && bill.includes("COLLECTION"))) {
-      logger.info("Detected a summary report instead of a bill - skipping processing");
+      console.log("Detected a summary report instead of a bill - skipping processing");
       return res.status(200).json({
         success: false,
         message: "Input appears to be a summary report rather than individual bills"
@@ -401,7 +401,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
 
 
         // Debug log the extracted bill data
-        logger.info(`"Extracted bill data:",${JSON.stringify(billData, null, 2)}`);
+        console.log(`"Extracted bill data:",${JSON.stringify(billData, null, 2)}`);
 
         // Validation - Skip bills with invalid data
         if (!billData.billNo || !billData.date || isNaN(billData.date.getTime())) {
@@ -597,7 +597,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
 
       // If all failures are due to missing essential info, return success to prevent retries
       if (allMissingEssentialInfo) {
-        logger.info("All bills failed due to missing essential info - marking as success to prevent retries");
+        console.log("All bills failed due to missing essential info - marking as success to prevent retries");
         return res.status(200).json({
           success: true,
           message: "Bills skipped due to missing essential information",

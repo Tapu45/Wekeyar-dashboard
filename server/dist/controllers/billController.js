@@ -5,43 +5,18 @@ const client_1 = require("@prisma/client");
 const PrintLog_1 = require("./lib/PrintLog");
 async function postDailyBills(req, res) {
     const prisma = new client_1.PrismaClient();
-    console.log(req.body.bill);
-    const bill = `VSS/11134
-09-07-2025
-001,12:48
-CASH BILL
-VSS NAGAR
-BHUBANESWAR
-7205959349
-KH38883R KH38884RC KH16457RX
-21AACCW4774G1ZD
-1
-REBALANZ ORS ORANGE 200ML
-200980
-H046
-11/25
-40.00
-5.00
-6.00
-6.00
-33.92
-40.00
-Rs. Thirty Eight Only
-40.00
-2.00
-38.00
-Our Software MARG Erp 9437026823,7978789800`;
+    const { bill } = req.body;
     try {
         if (!bill) {
             PrintLog_1.logger.error("Invalid request body", bill);
             return res.status(400).json({ error: "Invalid request body" });
         }
-        PrintLog_1.logger.info("Processing bill input");
-        PrintLog_1.logger.info(bill);
+        console.log("Processing bill input");
+        console.log(bill);
         if (bill.includes("Weekly Sale Report") ||
             (bill.includes("TOTAL NET SALE") && bill.includes("TOTAL COLLECTION")) ||
             (bill.includes("SALE") && bill.includes("RETURN") && bill.includes("NET SALE") && bill.includes("COLLECTION"))) {
-            PrintLog_1.logger.info("Detected a summary report instead of a bill - skipping processing");
+            console.log("Detected a summary report instead of a bill - skipping processing");
             return res.status(200).json({
                 success: false,
                 message: "Input appears to be a summary report rather than individual bills"
@@ -302,7 +277,7 @@ Our Software MARG Erp 9437026823,7978789800`;
                 if (medicineItems.length > 0) {
                     billData.items = medicineItems;
                 }
-                PrintLog_1.logger.info(`"Extracted bill data:",${JSON.stringify(billData, null, 2)}`);
+                console.log(`"Extracted bill data:",${JSON.stringify(billData, null, 2)}`);
                 if (!billData.billNo || !billData.date || isNaN(billData.date.getTime())) {
                     PrintLog_1.logger.error(`Invalid bill data: ${billData}`);
                     failedBills.push({
@@ -463,7 +438,7 @@ Our Software MARG Erp 9437026823,7978789800`;
             const allMissingEssentialInfo = failedBills.every(bill => bill.error === "Missing essential bill information (bill number or date)" ||
                 bill.error.includes("already exists"));
             if (allMissingEssentialInfo) {
-                PrintLog_1.logger.info("All bills failed due to missing essential info - marking as success to prevent retries");
+                console.log("All bills failed due to missing essential info - marking as success to prevent retries");
                 return res.status(200).json({
                     success: true,
                     message: "Bills skipped due to missing essential information",

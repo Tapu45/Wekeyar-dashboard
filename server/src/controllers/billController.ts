@@ -237,7 +237,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
         if (amountTextIndex !== -1) {
           billData.amountText = cleanedLines[amountTextIndex];
 
-          // Find the index of "Our Software" or similar line
+          // METHOD 1: Original approach - Find the index of "Our Software" or similar line
           const softwareLineIndex = cleanedLines.findIndex((line: string) =>
             line.toLowerCase().includes("our software") ||
             line.toLowerCase().includes("software") ||
@@ -259,6 +259,35 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
 
             if (lastFoundAmount !== null) {
               billData.amountPaid = lastFoundAmount;
+              console.log(`Method 1: Found amount paid via software line: ${billData.amountPaid}`);
+            }
+          }
+          // METHOD 2: Alternative approach when no software line is found
+          else {
+            // Look for consecutive decimal values after the amount text
+            const decimalValues = [];
+            let i = amountTextIndex + 1;
+
+            // Keep collecting consecutive decimal values
+            while (i < cleanedLines.length) {
+              const line = cleanedLines[i].trim();
+
+              // If it's a decimal value (format: XXX.XX), add it
+              if (/^\d+\.\d{2}$/.test(line)) {
+                decimalValues.push(parseFloat(line));
+                i++;
+              } else {
+                // Stop when we hit any non-decimal line
+                break;
+              }
+            }
+
+            console.log(`Method 2: Found ${decimalValues.length} decimal values after amount text:`, decimalValues);
+
+            // The amount paid is typically the LAST decimal value
+            if (decimalValues.length > 0) {
+              billData.amountPaid = decimalValues[decimalValues.length - 1];
+              console.log(`Method 2: Selected amount paid: ${billData.amountPaid}`);
             }
           }
         }

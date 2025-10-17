@@ -26,7 +26,6 @@ export async function clearStoreDataByName(storeName: string): Promise<ClearStor
 
     // 1. Delete bill details in chunks
     while (true) {
-      // Get a chunk of billDetails IDs to delete
       const billDetailsToDelete = await prisma.billDetails.findMany({
         where: {
           bill: {
@@ -52,7 +51,7 @@ export async function clearStoreDataByName(storeName: string): Promise<ClearStor
     while (true) {
       const billsToDelete = await prisma.bill.findMany({
         where: { storeId: store.id },
-        select: { id: true },
+        select: { id: true, customerId: true },
         take: CHUNK_SIZE
       });
 
@@ -67,19 +66,32 @@ export async function clearStoreDataByName(storeName: string): Promise<ClearStor
       totalBillsDeleted += deleted.count;
     }
 
-    // 3. Find and delete unused customers
-    const customersToDelete = await prisma.customer.findMany({
+    // 3. Find and delete unused customers related only to this store
+    const customersOfStore = await prisma.customer.findMany({
       where: {
         isCashlist: false,
         bills: {
-          none: {}
+          some: {
+            storeId: store.id
+          }
         }
       },
       select: { id: true }
     });
 
+    const customersToDelete: { id: number }[] = [];
+    for (const customer of customersOfStore) {
+      const billCount = await prisma.bill.count({
+        where: {
+          customerId: customer.id
+        }
+      });
+      if (billCount === 0) {
+        customersToDelete.push(customer);
+      }
+    }
+
     if (customersToDelete.length > 0) {
-      // Delete customers in chunks
       for (let i = 0; i < customersToDelete.length; i += CHUNK_SIZE) {
         const chunk = customersToDelete.slice(i, i + CHUNK_SIZE);
         const deleted = await prisma.customer.deleteMany({
@@ -92,6 +104,10 @@ export async function clearStoreDataByName(storeName: string): Promise<ClearStor
         totalCustomersDeleted += deleted.count;
       }
     }
+
+    await prisma.store.delete({
+      where: { id: store.id }
+    });
 
     const result = {
       storeName: store.storeName,
@@ -106,20 +122,32 @@ export async function clearStoreDataByName(storeName: string): Promise<ClearStor
   } catch (error) {
     console.error(`Error clearing store "${storeName}" data:`, error);
     throw error;
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
 async function main() {
-  try {
-    const result = await clearStoreDataByName("DUMDUMA");
-    console.log(result);
-  } catch (error) {
-    console.error(error);
-  } finally {
-    process.exit(0);
+ const storeNames = [
+  "DR NIROJ MISHRA",
+  "594",
+  "DR. A SAHOO",
+  "137",
+  "DR LAXMIDHAR PARHI",
+  "292",
+  "DR SRIRAJ",
+  "5DR SRIRAJ"
+];
+
+  for (const storeName of storeNames) {
+    try {
+      const result = await clearStoreDataByName(storeName);
+      console.log(result);
+    } catch (error) {
+      console.error(`Failed to clear data for store "${storeName}":`, error);
+    }
   }
+
+  await prisma.$disconnect();
+  process.exit(0);
 }
 
 main();

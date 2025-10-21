@@ -627,7 +627,9 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
       })
       const allMissingEssentialInfo = failedBills.every(bill =>
         bill.error === "Missing essential bill information (bill number or date)" ||
-        bill.error.includes("already exists")
+        bill.error === "Missing store information" ||
+        bill.error.includes("already exists") ||
+        bill.error.includes("Unique constraint failed")
       );
 
       // If all failures are due to missing essential info, return success to prevent retries

@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
@@ -8,43 +8,42 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 model Customer {
-  id        Int      @id @default(autoincrement())
-  name      String
-  phone     String   @unique
-  address   String? // Optional address
-  isCashlist  Boolean  @default(false)
-  bills     Bill[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  name       String
+  phone      String   @unique
+  address    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  isCashlist Boolean  @default(false)
+  bills      Bill[]
 }
 
 model Store {
   id        Int      @id @default(autoincrement())
   storeName String   @unique
   address   String?
-  phone     String?  // Add this field
-  email     String?  // Add this field
-  bills     Bill[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  email     String?
+  phone     String?
+  bills     Bill[]
 }
 
 model Bill {
   id           Int           @id @default(autoincrement())
-  billNo       String        
+  billNo       String        @unique
   customerId   Int
   storeId      Int
   date         DateTime      @default(now())
   netDiscount  Float
   netAmount    Float
-  amountPaid   Float
-  creditAmount Float
-  paymentType  String
   isUploaded   Boolean       @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  amountPaid   Float
+  creditAmount Float
+  paymentType  String
   customer     Customer      @relation(fields: [customerId], references: [id])
   store        Store         @relation(fields: [storeId], references: [id])
   billDetails  BillDetails[]
@@ -63,57 +62,57 @@ model BillDetails {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   expBatch  String
-  bill Bill @relation(fields: [billId], references: [id])
+  bill      Bill     @relation(fields: [billId], references: [id])
 }
 
 model UploadHistory {
   id         Int      @id @default(autoincrement())
   fileName   String
   uploadDate DateTime @default(now())
-  fileUrl    String?
   status     String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  fileUrl    String?
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  email     String   @unique
-  password  String
-  role      String   // e.g., "admin" or "report-access"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  telecallingOrders    TelecallingOrder[]  
-  handledCustomers       TelecallerHandledCustomer[]
+  id                Int                         @id @default(autoincrement())
+  username          String                      @unique
+  email             String                      @unique
+  password          String
+  role              String
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  handledCustomers  TelecallerHandledCustomer[]
+  telecallingOrders TelecallingOrder[]
 }
 
 model TelecallingCustomer {
-  id                Int      @id @default(autoincrement())
-  customerId        Int      @unique
-  customerName      String
-  customerPhone     String
-  storeName         String?
-  address           String? 
-  lastPurchaseDate  DateTime?
-  remarks           String?  // Add a remarks field for telecalling
-  status            String   @default("not send") 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  orders            TelecallingOrder[] // Relation to TelecallingOrder
-  handledBy              TelecallerHandledCustomer[] // Relation to TelecallerHandledCustomer
+  id               Int                         @id @default(autoincrement())
+  customerId       Int                         @unique
+  customerName     String
+  customerPhone    String
+  storeName        String?
+  lastPurchaseDate DateTime?
+  remarks          String?
+  status           String                      @default("not send")
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  address          String?
+  handledBy        TelecallerHandledCustomer[]
+  orders           TelecallingOrder[]
 }
 
 model TelecallingOrder {
-  id                Int      @id @default(autoincrement())
+  id                    Int                       @id @default(autoincrement())
   telecallingCustomerId Int
-  telecallerId       Int
-  orderDate         DateTime @default(now())
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  telecallingCustomer TelecallingCustomer @relation(fields: [telecallingCustomerId], references: [id])
-  telecaller            User @relation(fields: [telecallerId], references: [id]) // Relation to User
-   orderDetails         TelecallingOrderDetails[] // Relation to order details
+  telecallerId          Int
+  orderDate             DateTime                  @default(now())
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  telecaller            User                      @relation(fields: [telecallerId], references: [id])
+  telecallingCustomer   TelecallingCustomer       @relation(fields: [telecallingCustomerId], references: [id])
+  orderDetails          TelecallingOrderDetails[]
 }
 
 model Product {
@@ -126,33 +125,32 @@ model Product {
 }
 
 model TelecallingOrderDetails {
-  id                   Int                     @id @default(autoincrement())
-  telecallingOrderId   Int
-  productName          String
-  quantity             Int
-  isNewProduct         Boolean                 @default(false)
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
-  telecallingOrder     TelecallingOrder        @relation(fields: [telecallingOrderId], references: [id])
+  id                 Int              @id @default(autoincrement())
+  telecallingOrderId Int
+  productName        String
+  quantity           Int
+  isNewProduct       Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  telecallingOrder   TelecallingOrder @relation(fields: [telecallingOrderId], references: [id])
 }
 
 model TelecallerHandledCustomer {
-  id           Int      @id @default(autoincrement())
-  telecallerId Int      // ID of the telecaller who handled the customer
-  customerId   Int      // ID of the customer who was handled
-  handledAt    DateTime @default(now()) // Timestamp for when the customer was handled
-
-  telecaller   User     @relation(fields: [telecallerId], references: [id]) // Relation to the User model
-  customer     TelecallingCustomer @relation(fields: [customerId], references: [id]) // Relation to the TelecallingCustomer model
+  id           Int                 @id @default(autoincrement())
+  telecallerId Int
+  customerId   Int
+  handledAt    DateTime            @default(now())
+  customer     TelecallingCustomer @relation(fields: [customerId], references: [id])
+  telecaller   User                @relation(fields: [telecallerId], references: [id])
 }
 
 model TelecallingNewCustomer {
-  id              Int      @id @default(autoincrement())
-  customerId      Int      @unique
-  storeName       String
-  customerName    String
-  customerPhone   String   @unique
-  address         String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  customerId    Int      @unique
+  storeName     String
+  customerName  String
+  customerPhone String   @unique
+  address       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

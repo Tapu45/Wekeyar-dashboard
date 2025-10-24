@@ -179,6 +179,26 @@ async function postDailyBills(req, res) {
                         }
                         if (lastFoundAmount !== null) {
                             billData.amountPaid = lastFoundAmount;
+                            console.log(`Method 1: Found amount paid via software line: ${billData.amountPaid}`);
+                        }
+                    }
+                    else {
+                        const decimalValues = [];
+                        let i = amountTextIndex + 1;
+                        while (i < cleanedLines.length) {
+                            const line = cleanedLines[i].trim();
+                            if (/^\d+\.\d{2}$/.test(line)) {
+                                decimalValues.push(parseFloat(line));
+                                i++;
+                            }
+                            else {
+                                break;
+                            }
+                        }
+                        console.log(`Method 2: Found ${decimalValues.length} decimal values after amount text:`, decimalValues);
+                        if (decimalValues.length > 0) {
+                            billData.amountPaid = decimalValues[decimalValues.length - 1];
+                            console.log(`Method 2: Selected amount paid: ${billData.amountPaid}`);
                         }
                     }
                 }
@@ -278,7 +298,7 @@ async function postDailyBills(req, res) {
                 if (medicineItems.length > 0) {
                     billData.items = medicineItems;
                 }
-                console.log(`"Extracted bill data:",${JSON.stringify(billData, null, 2)}`);
+                console.log("Extracted bill data:", JSON.stringify(billData, null, 2));
                 if (!billData.billNo || !billData.date || isNaN(billData.date.getTime())) {
                     PrintLog_1.logger.error(`Invalid bill data: ${billData}`);
                     failedBills.push({
@@ -387,7 +407,7 @@ async function postDailyBills(req, res) {
                     }
                 });
                 if (existingBill) {
-                    PrintLog_1.logger.error(`Bill with number ${billData.billNo} already exists`);
+                    console.error(`Bill with number ${billData.billNo} already exists`);
                     return res.status(200).json({ success: true });
                 }
                 const newBill = await prisma.bill.create({
@@ -438,8 +458,8 @@ async function postDailyBills(req, res) {
         }
         else if (failedBills.length > 0) {
             failedBills.map((bill) => {
-                PrintLog_1.logger.error(`Failed bill: ${bill.error}`);
-                PrintLog_1.logger.error(`Failed bill logic check:", ${bill.error.includes("already exists")}`);
+                console.log("Failed bill:", bill.error);
+                console.log("Failed bill:", bill.error.includes("already exists"));
             });
             const allMissingEssentialInfo = failedBills.every(bill => bill.error === "Missing essential bill information (bill number or date)" ||
                 bill.error.includes("already exists"));
@@ -465,7 +485,7 @@ async function postDailyBills(req, res) {
         }
     }
     catch (error) {
-        PrintLog_1.logger.error(`Error in postDailyBills: ${error}`);
+        console.error("Error in postDailyBills:", error);
         return res.status(500).json({
             error: "Failed to process bills",
             details: error instanceof Error ? error.message : "Unknown error"

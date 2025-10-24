@@ -37,7 +37,7 @@ async function clearStoreDataByName(storeName) {
         while (true) {
             const billsToDelete = await prisma.bill.findMany({
                 where: { storeId: store.id },
-                select: { id: true },
+                select: { id: true, customerId: true },
                 take: CHUNK_SIZE
             });
             if (billsToDelete.length === 0)
@@ -49,15 +49,28 @@ async function clearStoreDataByName(storeName) {
             });
             totalBillsDeleted += deleted.count;
         }
-        const customersToDelete = await prisma.customer.findMany({
+        const customersOfStore = await prisma.customer.findMany({
             where: {
                 isCashlist: false,
                 bills: {
-                    none: {}
+                    some: {
+                        storeId: store.id
+                    }
                 }
             },
             select: { id: true }
         });
+        const customersToDelete = [];
+        for (const customer of customersOfStore) {
+            const billCount = await prisma.bill.count({
+                where: {
+                    customerId: customer.id
+                }
+            });
+            if (billCount === 0) {
+                customersToDelete.push(customer);
+            }
+        }
         if (customersToDelete.length > 0) {
             for (let i = 0; i < customersToDelete.length; i += CHUNK_SIZE) {
                 const chunk = customersToDelete.slice(i, i + CHUNK_SIZE);
@@ -71,6 +84,9 @@ async function clearStoreDataByName(storeName) {
                 totalCustomersDeleted += deleted.count;
             }
         }
+        await prisma.store.delete({
+            where: { id: store.id }
+        });
         const result = {
             storeName: store.storeName,
             billsDeleted: totalBillsDeleted,
@@ -84,21 +100,29 @@ async function clearStoreDataByName(storeName) {
         console.error(`Error clearing store "${storeName}" data:`, error);
         throw error;
     }
-    finally {
-        await prisma.$disconnect();
-    }
 }
 async function main() {
-    try {
-        const result = await clearStoreDataByName("UNKNOWN STORE");
-        console.log(result);
+    const storeNames = [
+        "DR NIROJ MISHRA",
+        "594",
+        "DR. A SAHOO",
+        "137",
+        "DR LAXMIDHAR PARHI",
+        "292",
+        "DR SRIRAJ",
+        "5DR SRIRAJ"
+    ];
+    for (const storeName of storeNames) {
+        try {
+            const result = await clearStoreDataByName(storeName);
+            console.log(result);
+        }
+        catch (error) {
+            console.error(`Failed to clear data for store "${storeName}":`, error);
+        }
     }
-    catch (error) {
-        console.error(error);
-    }
-    finally {
-        process.exit(0);
-    }
+    await prisma.$disconnect();
+    process.exit(0);
 }
 main();
 //# sourceMappingURL=ClearSpecificData.js.map

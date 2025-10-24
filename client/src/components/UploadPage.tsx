@@ -1135,15 +1135,30 @@ const FileUpload: React.FC = () => {
                             {history.status}
                           </span>
                           {history.fileUrl && (
-                            <a
-                              href={history.fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
                               className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
                               title="Download File"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  const response = await fetch(history.fileUrl);
+                                  const blob = await response.blob();
+                                  const url = window.URL.createObjectURL(blob);
+                                  const a = document.createElement("a");
+                                  a.href = url;
+                                  a.download =
+                                    history.fileName || "download.xlsx";
+                                  document.body.appendChild(a);
+                                  a.click();
+                                  a.remove();
+                                  window.URL.revokeObjectURL(url);
+                                } catch (err) {
+                                  alert("Failed to download file.");
+                                }
+                              }}
                             >
                               <Download size={16} />
-                            </a>
+                            </button>
                           )}
                           <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"></button>
                         </div>
@@ -1180,21 +1195,28 @@ const FileUpload: React.FC = () => {
                                 </div>
                               </div>
                             </div>
-                             {/* Logs Section */}
-        <div className="mt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Logs</h4>
-          <div className="bg-white rounded-lg border border-gray-100 p-4 max-h-40 overflow-y-auto custom-scrollbar">
-            {logs.length === 0 ? (
-              <p className="text-gray-500 text-sm">No logs available yet...</p>
-            ) : (
-              logs.map((log, index) => (
-                <p key={index} className="text-sm text-gray-700">
-                  {log}
-                </p>
-              ))
-            )}
-          </div>
-        </div>
+                            {/* Logs Section */}
+                            <div className="mt-4">
+                              <h4 className="text-sm font-medium text-gray-700 mb-2">
+                                Logs
+                              </h4>
+                              <div className="bg-white rounded-lg border border-gray-100 p-4 max-h-40 overflow-y-auto custom-scrollbar">
+                                {logs.length === 0 ? (
+                                  <p className="text-gray-500 text-sm">
+                                    No logs available yet...
+                                  </p>
+                                ) : (
+                                  logs.map((log, index) => (
+                                    <p
+                                      key={index}
+                                      className="text-sm text-gray-700"
+                                    >
+                                      {log}
+                                    </p>
+                                  ))
+                                )}
+                              </div>
+                            </div>
                             <div className="flex justify-end mt-2">
                               <button
                                 onClick={() => handleDeleteHistory(history.id)} // Pass the history ID to delete a specific record

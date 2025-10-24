@@ -782,44 +782,83 @@ async function processExcelFile() {
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    // Get existing bills to avoid duplicates
-    const existingBillNos = new Set(
-      (
-        await executeWithRetry(async () => {
-          return prisma.bill.findMany({
-            where: {
-              AND: [
-                {
-                  billNo: {
-                    in: validBillRecords.map((bill) => bill.billNo),
-                  },
-                },
-                {
-                  storeId: storeId, // Include storeId in the where clause
-                },
-              ],
+    // Get existing bills to check for updates or skips
+    const existingBills = await executeWithRetry(async () => {
+      return prisma.bill.findMany({
+        where: {
+          AND: [
+            {
+              billNo: {
+                in: validBillRecords.map((bill) => bill.billNo),
+              },
             },
+            {
+              storeId: storeId,
+            },
+          ],
+        },
+        select: {
+          id: true,
+          billNo: true,
+          storeId: true,
+          customerId: true,
+          date: true,
+          netAmount: true,
+          amountPaid: true,
+          creditAmount: true,
+          billDetails: {
             select: {
-              billNo: true,
-              storeId: true
-            },
-          });
-        })
-      ).map((bill) => `${bill.billNo}-${bill.storeId}`) // Create composite key
+              id: true,
+              item: true,
+              quantity: true,
+              batch: true,
+              mrp: true,
+            }
+          }
+        },
+      });
+    });
+
+    // Create a map for quick lookup
+    const existingBillsMap = new Map(
+      existingBills.map((bill) => [`${bill.billNo}-${bill.storeId}`, bill])
     );
 
-    // Filter out existing bills using composite key
-    const newBills = validBillRecords.filter(
-      (bill) => !existingBillNos.has(`${bill.billNo}-${storeId}`)
-    );
+    // Separate bills into new and existing
+    const billsToCreate = [];
+    const billsToUpdate = [];
+
+    for (const bill of validBillRecords) {
+      const compositeKey = `${bill.billNo}-${storeId}`;
+      const existingBill = existingBillsMap.get(compositeKey);
+
+      if (!existingBill) {
+        // Bill doesn't exist, add to create list
+        billsToCreate.push(bill);
+      } else {
+        // Bill exists, check if it needs updating
+        const customerId = customerMap.get(bill.customerPhone);
+        const needsUpdate =
+          existingBill.customerId !== customerId ||
+          Math.abs(existingBill.netAmount - bill.totalAmount) > 0.01 ||
+          Math.abs(existingBill.amountPaid - bill.cash) > 0.01 ||
+          Math.abs(existingBill.creditAmount - bill.credit) > 0.01 ||
+          new Date(existingBill.date).getTime() !== new Date(bill.date).getTime() ||
+          existingBill.billDetails.length !== bill.items.length;
+
+        if (needsUpdate) {
+          billsToUpdate.push({ ...bill, existingBillId: existingBill.id });
+        }
+      }
+    }
+
     console.log(
-      `Processing ${newBills.length} new bills (${existingBillNos.size} already exist)`
+      `Processing: ${billsToCreate.length} new bills, ${billsToUpdate.length} bills to update, ${existingBills.length - billsToUpdate.length} bills unchanged`
     );
 
-    // NEW CODE: Pre-calculate MRP for all bills before database insertion
-    // Group bills by bill number for proper MRP calculation
+    // Pre-calculate MRP for new bills
     const billsGroupedByNumber = new Map();
-    for (const bill of newBills) {
+    for (const bill of billsToCreate) {
       billsGroupedByNumber.set(bill.billNo, bill);
     }
 
@@ -831,11 +870,8 @@ async function processExcelFile() {
         0
       );
 
-      // Only calculate if we have valid quantities and amount
       if (totalQuantity > 0 && totalBillAmount > 0) {
         const mrpPerUnit = totalBillAmount / totalQuantity;
-
-        // Apply the calculated MRP to each item
         for (const item of bill.items) {
           if (item.mrp === 0) {
             item.mrp = mrpPerUnit;
@@ -844,18 +880,37 @@ async function processExcelFile() {
       }
     }
 
-    // Process new bills in smaller batches
-    const billBatches = [];
-    for (let i = 0; i < newBills.length; i += BATCH_SIZE) {
-      billBatches.push(newBills.slice(i, i + BATCH_SIZE));
+    // Pre-calculate MRP for bills to update
+    for (const bill of billsToUpdate) {
+      const totalBillAmount = bill.totalAmount;
+      const totalQuantity = bill.items.reduce(
+        (sum, item) => sum + item.quantity,
+        0
+      );
+
+      if (totalQuantity > 0 && totalBillAmount > 0) {
+        const mrpPerUnit = totalBillAmount / totalQuantity;
+        for (const item of bill.items) {
+          if (item.mrp === 0) {
+            item.mrp = mrpPerUnit;
+          }
+        }
+      }
+    }
+
+    // Process new bills in batches
+    const createBatches = [];
+    for (let i = 0; i < billsToCreate.length; i += BATCH_SIZE) {
+      createBatches.push(billsToCreate.slice(i, i + BATCH_SIZE));
     }
 
     let batchCount = 0;
-    for (const billBatch of billBatches) {
-      batchCount++;
-      console.log(`Processing batch ${batchCount} of ${billBatches.length}`);
+    let billsCreated = 0;
 
-      // Process bills sequentially within each batch
+    for (const billBatch of createBatches) {
+      batchCount++;
+      console.log(`Creating batch ${batchCount} of ${createBatches.length}`);
+
       for (const bill of billBatch) {
         try {
           const customerId = customerMap.get(bill.customerPhone);
@@ -867,13 +922,8 @@ async function processExcelFile() {
             continue;
           }
 
-          const netAmount = bill.totalAmount;
-          const amountPaid = bill.cash;
-          const creditAmount = bill.credit;
-
           await executeWithRetry(async () => {
             return prisma.$transaction(async (tx) => {
-              // Create bill
               const newBill = await tx.bill.create({
                 data: {
                   billNo: bill.billNo,
@@ -881,30 +931,24 @@ async function processExcelFile() {
                   storeId: storeId,
                   date: bill.date,
                   netDiscount: 0,
-                  netAmount: netAmount,
-                  amountPaid: amountPaid,
-                  creditAmount: creditAmount,
-                  paymentType: creditAmount > 0 ? "CREDIT" : "CASH",
+                  netAmount: bill.totalAmount,
+                  amountPaid: bill.cash,
+                  creditAmount: bill.credit,
+                  paymentType: bill.credit > 0 ? "CREDIT" : "CASH",
                   isUploaded: true,
                 },
               });
 
-              // Prepare all bill details for bulk insert
-              const billDetails = [];
-              for (const item of bill.items) {
-                // MRP is already calculated above, use it directly
-                billDetails.push({
-                  billId: newBill.id,
-                  item: item.name,
-                  quantity: item.quantity,
-                  batch: item.batch || "",
-                  expBatch: item.expBatch || "",
-                  mrp: item.mrp,
-                  discount: 0,
-                });
-              }
+              const billDetails = bill.items.map(item => ({
+                billId: newBill.id,
+                item: item.name,
+                quantity: item.quantity,
+                batch: item.batch || "",
+                expBatch: item.expBatch || "",
+                mrp: item.mrp,
+                discount: 0,
+              }));
 
-              // Create bill details in smaller chunks to avoid timeouts
               if (billDetails.length > 0) {
                 for (let i = 0; i < billDetails.length; i += 20) {
                   const detailChunk = billDetails.slice(i, i + 20);
@@ -917,47 +961,127 @@ async function processExcelFile() {
             });
           });
 
-          totalBills++;
+          billsCreated++;
           totalItems += bill.items.length;
         } catch (error) {
-          console.error(`Error processing bill ${bill.billNo}:`, error.message);
+          console.error(`Error creating bill ${bill.billNo}:`, error.message);
         }
       }
 
-      // Update progress after each batch
-      const processingProgress = (batchCount / billBatches.length) * 100;
-      parentPort.postMessage({
-        status: "progress",
-        progress: 90 + processingProgress * 0.1, // 90-100% for DB operations
-      });
-      // Final completion message
-
-      // Give connections time to be released between batches
       await prisma.$disconnect();
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await prisma.$connect();
     }
+
+    // Process bills to update
+    const updateBatches = [];
+    for (let i = 0; i < billsToUpdate.length; i += BATCH_SIZE) {
+      updateBatches.push(billsToUpdate.slice(i, i + BATCH_SIZE));
+    }
+
+    let billsUpdated = 0;
+
+    for (const billBatch of updateBatches) {
+      batchCount++;
+      console.log(`Updating batch ${batchCount}`);
+
+      for (const bill of billBatch) {
+        try {
+          const customerId = customerMap.get(bill.customerPhone);
+
+          if (!customerId) {
+            console.warn(
+              `Missing customer ID for phone ${bill.customerPhone}, skipping bill ${bill.billNo}`
+            );
+            continue;
+          }
+
+          await executeWithRetry(async () => {
+            return prisma.$transaction(async (tx) => {
+              // Update the bill
+              await tx.bill.update({
+                where: { id: bill.existingBillId },
+                data: {
+                  customerId: customerId,
+                  date: bill.date,
+                  netAmount: bill.totalAmount,
+                  amountPaid: bill.cash,
+                  creditAmount: bill.credit,
+                  paymentType: bill.credit > 0 ? "CREDIT" : "CASH",
+                  isUploaded: true,
+                },
+              });
+
+              // Delete old bill details
+              await tx.billDetails.deleteMany({
+                where: { billId: bill.existingBillId },
+              });
+
+              // Create new bill details
+              const billDetails = bill.items.map(item => ({
+                billId: bill.existingBillId,
+                item: item.name,
+                quantity: item.quantity,
+                batch: item.batch || "",
+                expBatch: item.expBatch || "",
+                mrp: item.mrp,
+                discount: 0,
+              }));
+
+              if (billDetails.length > 0) {
+                for (let i = 0; i < billDetails.length; i += 20) {
+                  const detailChunk = billDetails.slice(i, i + 20);
+                  await tx.billDetails.createMany({
+                    data: detailChunk,
+                    skipDuplicates: true,
+                  });
+                }
+              }
+            });
+          });
+
+          billsUpdated++;
+          totalItems += bill.items.length;
+        } catch (error) {
+          console.error(`Error updating bill ${bill.billNo}:`, error.message);
+        }
+      }
+
+      await prisma.$disconnect();
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await prisma.$connect();
+    }
+
+    totalBills = billsCreated + billsUpdated;
+
+    // Update progress after processing
+    parentPort.postMessage({
+      status: "progress",
+      progress: 95,
+    });
+
     console.timeEnd("Database operations");
 
     const endTime = Date.now();
     const processingTimeSeconds = ((endTime - startTime) / 1000).toFixed(2);
 
     console.log(`Processing completed in ${processingTimeSeconds} seconds`);
-    console.log(`Bills created: ${totalBills}, Items created: ${totalItems}`);
+    console.log(`Bills created: ${billsCreated}, Bills updated: ${billsUpdated}, Items processed: ${totalItems}`);
 
     parentPort.postMessage({
       status: "completed",
       stats: {
         totalProcessed: processedRows,
         billsExtracted: billRecords.length,
-        billsCreated: totalBills,
+        billsCreated: billsCreated,
+        billsUpdated: billsUpdated,
+        billsUnchanged: existingBills.length - billsUpdated,
         itemsCreated: totalItems,
         processingTimeSeconds: processingTimeSeconds,
       },
     });
 
     // Clean up resources
-
     await prisma.$disconnect();
   } catch (error) {
     console.error("Worker error:", error);

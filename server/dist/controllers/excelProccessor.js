@@ -592,7 +592,7 @@ async function processExcelFile() {
             }
             await new Promise((resolve) => setTimeout(resolve, 500));
         }
-        const existingBillNos = new Set((await executeWithRetry(async () => {
+        const existingBills = await executeWithRetry(async () => {
             return prisma.bill.findMany({
                 where: {
                     AND: [
@@ -607,15 +607,51 @@ async function processExcelFile() {
                     ],
                 },
                 select: {
+                    id: true,
                     billNo: true,
-                    storeId: true
+                    storeId: true,
+                    customerId: true,
+                    date: true,
+                    netAmount: true,
+                    amountPaid: true,
+                    creditAmount: true,
+                    billDetails: {
+                        select: {
+                            id: true,
+                            item: true,
+                            quantity: true,
+                            batch: true,
+                            mrp: true,
+                        }
+                    }
                 },
             });
-        })).map((bill) => `${bill.billNo}-${bill.storeId}`));
-        const newBills = validBillRecords.filter((bill) => !existingBillNos.has(`${bill.billNo}-${storeId}`));
-        console.log(`Processing ${newBills.length} new bills (${existingBillNos.size} already exist)`);
+        });
+        const existingBillsMap = new Map(existingBills.map((bill) => [`${bill.billNo}-${bill.storeId}`, bill]));
+        const billsToCreate = [];
+        const billsToUpdate = [];
+        for (const bill of validBillRecords) {
+            const compositeKey = `${bill.billNo}-${storeId}`;
+            const existingBill = existingBillsMap.get(compositeKey);
+            if (!existingBill) {
+                billsToCreate.push(bill);
+            }
+            else {
+                const customerId = customerMap.get(bill.customerPhone);
+                const needsUpdate = existingBill.customerId !== customerId ||
+                    Math.abs(existingBill.netAmount - bill.totalAmount) > 0.01 ||
+                    Math.abs(existingBill.amountPaid - bill.cash) > 0.01 ||
+                    Math.abs(existingBill.creditAmount - bill.credit) > 0.01 ||
+                    new Date(existingBill.date).getTime() !== new Date(bill.date).getTime() ||
+                    existingBill.billDetails.length !== bill.items.length;
+                if (needsUpdate) {
+                    billsToUpdate.push({ ...bill, existingBillId: existingBill.id });
+                }
+            }
+        }
+        console.log(`Processing: ${billsToCreate.length} new bills, ${billsToUpdate.length} bills to update, ${existingBills.length - billsToUpdate.length} bills unchanged`);
         const billsGroupedByNumber = new Map();
-        for (const bill of newBills) {
+        for (const bill of billsToCreate) {
             billsGroupedByNumber.set(bill.billNo, bill);
         }
         for (const bill of billsGroupedByNumber.values()) {
@@ -630,14 +666,27 @@ async function processExcelFile() {
                 }
             }
         }
-        const billBatches = [];
-        for (let i = 0; i < newBills.length; i += BATCH_SIZE) {
-            billBatches.push(newBills.slice(i, i + BATCH_SIZE));
+        for (const bill of billsToUpdate) {
+            const totalBillAmount = bill.totalAmount;
+            const totalQuantity = bill.items.reduce((sum, item) => sum + item.quantity, 0);
+            if (totalQuantity > 0 && totalBillAmount > 0) {
+                const mrpPerUnit = totalBillAmount / totalQuantity;
+                for (const item of bill.items) {
+                    if (item.mrp === 0) {
+                        item.mrp = mrpPerUnit;
+                    }
+                }
+            }
+        }
+        const createBatches = [];
+        for (let i = 0; i < billsToCreate.length; i += BATCH_SIZE) {
+            createBatches.push(billsToCreate.slice(i, i + BATCH_SIZE));
         }
         let batchCount = 0;
-        for (const billBatch of billBatches) {
+        let billsCreated = 0;
+        for (const billBatch of createBatches) {
             batchCount++;
-            console.log(`Processing batch ${batchCount} of ${billBatches.length}`);
+            console.log(`Creating batch ${batchCount} of ${createBatches.length}`);
             for (const bill of billBatch) {
                 try {
                     const customerId = customerMap.get(bill.customerPhone);
@@ -645,9 +694,6 @@ async function processExcelFile() {
                         console.warn(`Missing customer ID for phone ${bill.customerPhone}, skipping bill ${bill.billNo}`);
                         continue;
                     }
-                    const netAmount = bill.totalAmount;
-                    const amountPaid = bill.cash;
-                    const creditAmount = bill.credit;
                     await executeWithRetry(async () => {
                         return prisma.$transaction(async (tx) => {
                             const newBill = await tx.bill.create({
@@ -657,25 +703,22 @@ async function processExcelFile() {
                                     storeId: storeId,
                                     date: bill.date,
                                     netDiscount: 0,
-                                    netAmount: netAmount,
-                                    amountPaid: amountPaid,
-                                    creditAmount: creditAmount,
-                                    paymentType: creditAmount > 0 ? "CREDIT" : "CASH",
+                                    netAmount: bill.totalAmount,
+                                    amountPaid: bill.cash,
+                                    creditAmount: bill.credit,
+                                    paymentType: bill.credit > 0 ? "CREDIT" : "CASH",
                                     isUploaded: true,
                                 },
                             });
-                            const billDetails = [];
-                            for (const item of bill.items) {
-                                billDetails.push({
-                                    billId: newBill.id,
-                                    item: item.name,
-                                    quantity: item.quantity,
-                                    batch: item.batch || "",
-                                    expBatch: item.expBatch || "",
-                                    mrp: item.mrp,
-                                    discount: 0,
-                                });
-                            }
+                            const billDetails = bill.items.map(item => ({
+                                billId: newBill.id,
+                                item: item.name,
+                                quantity: item.quantity,
+                                batch: item.batch || "",
+                                expBatch: item.expBatch || "",
+                                mrp: item.mrp,
+                                discount: 0,
+                            }));
                             if (billDetails.length > 0) {
                                 for (let i = 0; i < billDetails.length; i += 20) {
                                     const detailChunk = billDetails.slice(i, i + 20);
@@ -687,33 +730,98 @@ async function processExcelFile() {
                             }
                         });
                     });
-                    totalBills++;
+                    billsCreated++;
                     totalItems += bill.items.length;
                 }
                 catch (error) {
-                    console.error(`Error processing bill ${bill.billNo}:`, error.message);
+                    console.error(`Error creating bill ${bill.billNo}:`, error.message);
                 }
             }
-            const processingProgress = (batchCount / billBatches.length) * 100;
-            parentPort.postMessage({
-                status: "progress",
-                progress: 90 + processingProgress * 0.1,
-            });
             await prisma.$disconnect();
             await new Promise((resolve) => setTimeout(resolve, 1000));
             await prisma.$connect();
         }
+        const updateBatches = [];
+        for (let i = 0; i < billsToUpdate.length; i += BATCH_SIZE) {
+            updateBatches.push(billsToUpdate.slice(i, i + BATCH_SIZE));
+        }
+        let billsUpdated = 0;
+        for (const billBatch of updateBatches) {
+            batchCount++;
+            console.log(`Updating batch ${batchCount}`);
+            for (const bill of billBatch) {
+                try {
+                    const customerId = customerMap.get(bill.customerPhone);
+                    if (!customerId) {
+                        console.warn(`Missing customer ID for phone ${bill.customerPhone}, skipping bill ${bill.billNo}`);
+                        continue;
+                    }
+                    await executeWithRetry(async () => {
+                        return prisma.$transaction(async (tx) => {
+                            await tx.bill.update({
+                                where: { id: bill.existingBillId },
+                                data: {
+                                    customerId: customerId,
+                                    date: bill.date,
+                                    netAmount: bill.totalAmount,
+                                    amountPaid: bill.cash,
+                                    creditAmount: bill.credit,
+                                    paymentType: bill.credit > 0 ? "CREDIT" : "CASH",
+                                    isUploaded: true,
+                                },
+                            });
+                            await tx.billDetails.deleteMany({
+                                where: { billId: bill.existingBillId },
+                            });
+                            const billDetails = bill.items.map(item => ({
+                                billId: bill.existingBillId,
+                                item: item.name,
+                                quantity: item.quantity,
+                                batch: item.batch || "",
+                                expBatch: item.expBatch || "",
+                                mrp: item.mrp,
+                                discount: 0,
+                            }));
+                            if (billDetails.length > 0) {
+                                for (let i = 0; i < billDetails.length; i += 20) {
+                                    const detailChunk = billDetails.slice(i, i + 20);
+                                    await tx.billDetails.createMany({
+                                        data: detailChunk,
+                                        skipDuplicates: true,
+                                    });
+                                }
+                            }
+                        });
+                    });
+                    billsUpdated++;
+                    totalItems += bill.items.length;
+                }
+                catch (error) {
+                    console.error(`Error updating bill ${bill.billNo}:`, error.message);
+                }
+            }
+            await prisma.$disconnect();
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            await prisma.$connect();
+        }
+        totalBills = billsCreated + billsUpdated;
+        parentPort.postMessage({
+            status: "progress",
+            progress: 95,
+        });
         console.timeEnd("Database operations");
         const endTime = Date.now();
         const processingTimeSeconds = ((endTime - startTime) / 1000).toFixed(2);
         console.log(`Processing completed in ${processingTimeSeconds} seconds`);
-        console.log(`Bills created: ${totalBills}, Items created: ${totalItems}`);
+        console.log(`Bills created: ${billsCreated}, Bills updated: ${billsUpdated}, Items processed: ${totalItems}`);
         parentPort.postMessage({
             status: "completed",
             stats: {
                 totalProcessed: processedRows,
                 billsExtracted: billRecords.length,
-                billsCreated: totalBills,
+                billsCreated: billsCreated,
+                billsUpdated: billsUpdated,
+                billsUnchanged: existingBills.length - billsUpdated,
                 itemsCreated: totalItems,
                 processingTimeSeconds: processingTimeSeconds,
             },

@@ -759,22 +759,19 @@ async function processExcelFile() {
     }
 
     for (const batch of customerBatches) {
-      // Process customers sequentially in smaller sub-batches to avoid connection pool exhaustion
+      // Process customers without transactions (each upsert is atomic anyway)
       for (let i = 0; i < batch.length; i += 10) {
         const subBatch = batch.slice(i, i + 10);
 
         await executeWithRetry(async () => {
-          // Use a transaction for the sub-batch
-          await prisma.$transaction(async (tx) => {
-            for (const customer of subBatch) {
-              const result = await tx.customer.upsert({
-                where: { phone: customer.phone },
-                update: { name: customer.name },
-                create: customer,
-              });
-              customerMap.set(customer.phone, result.id);
-            }
-          });
+          for (const customer of subBatch) {
+            const result = await prisma.customer.upsert({
+              where: { phone: customer.phone },
+              update: { name: customer.name },
+              create: customer,
+            });
+            customerMap.set(customer.phone, result.id);
+          }
         });
       }
 

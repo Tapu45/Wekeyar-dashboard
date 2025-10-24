@@ -32,7 +32,7 @@ model Store {
 
 model Bill {
   id           Int           @id @default(autoincrement())
-  billNo       String        @unique
+  billNo       String        
   customerId   Int
   storeId      Int
   date         DateTime      @default(now())

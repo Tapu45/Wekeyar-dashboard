@@ -2,12 +2,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.postDailyBills = postDailyBills;
 const client_1 = require("@prisma/client");
+const PrintLog_1 = require("./lib/PrintLog");
 async function postDailyBills(req, res) {
     const prisma = new client_1.PrismaClient();
     const { bill } = req.body;
     try {
         if (!bill) {
-            console.log("Invalid request body", bill);
+            PrintLog_1.logger.error("Invalid request body", bill);
             return res.status(400).json({ error: "Invalid request body" });
         }
         console.log("Processing bill input");
@@ -277,9 +278,9 @@ async function postDailyBills(req, res) {
                 if (medicineItems.length > 0) {
                     billData.items = medicineItems;
                 }
-                console.log("Extracted bill data:", JSON.stringify(billData, null, 2));
+                console.log(`"Extracted bill data:",${JSON.stringify(billData, null, 2)}`);
                 if (!billData.billNo || !billData.date || isNaN(billData.date.getTime())) {
-                    console.error("Invalid bill data:", billData);
+                    PrintLog_1.logger.error(`Invalid bill data: ${billData}`);
                     failedBills.push({
                         error: "Missing essential bill information (bill number or date)",
                         billText: billText.substring(0, 100) + "..."
@@ -386,7 +387,7 @@ async function postDailyBills(req, res) {
                     }
                 });
                 if (existingBill) {
-                    console.error(`Bill with number ${billData.billNo} already exists`);
+                    PrintLog_1.logger.error(`Bill with number ${billData.billNo} already exists`);
                     return res.status(200).json({ success: true });
                 }
                 const newBill = await prisma.bill.create({
@@ -419,7 +420,7 @@ async function postDailyBills(req, res) {
                 });
             }
             catch (error) {
-                console.error("Error processing bill:", error);
+                PrintLog_1.logger.error(`Error processing bill:${error}`);
                 failedBills.push({
                     error: error instanceof Error ? error.message : "Unknown error",
                     billText: billText.substring(0, 100) + "..."
@@ -437,8 +438,8 @@ async function postDailyBills(req, res) {
         }
         else if (failedBills.length > 0) {
             failedBills.map((bill) => {
-                console.log("Failed bill:", bill.error);
-                console.log("Failed bill:", bill.error.includes("already exists"));
+                PrintLog_1.logger.error(`Failed bill: ${bill.error}`);
+                PrintLog_1.logger.error(`Failed bill logic check:", ${bill.error.includes("already exists")}`);
             });
             const allMissingEssentialInfo = failedBills.every(bill => bill.error === "Missing essential bill information (bill number or date)" ||
                 bill.error.includes("already exists"));
@@ -464,7 +465,7 @@ async function postDailyBills(req, res) {
         }
     }
     catch (error) {
-        console.error("Error in postDailyBills:", error);
+        PrintLog_1.logger.error(`Error in postDailyBills: ${error}`);
         return res.status(500).json({
             error: "Failed to process bills",
             details: error instanceof Error ? error.message : "Unknown error"

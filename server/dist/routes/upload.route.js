@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const middleware_1 = require("../middleware");
 const uploadController_1 = require("../controllers/uploadController");
+const billController_1 = require("../controllers/billController");
+const Logs_1 = require("../controllers/lib/Logs");
 const router = express_1.default.Router();
 router.post('/upload', (req, res, next) => {
     (0, middleware_1.uploadMiddleware)(req, res, (err) => {
@@ -20,5 +22,7 @@ router.get('/upload/history', uploadController_1.getUploadHistory);
 router.delete("/upload/history/:id?", uploadController_1.deleteUploadHistory);
 router.get("/upload/status/:id", uploadController_1.getUploadStatus);
 router.get("/upload/logs/:id", uploadController_1.uploadLogsSSE);
+router.post("/upload/daily/bill", billController_1.postDailyBills);
+router.get("/logs", Logs_1.getLogs);
 exports.default = router;
 //# sourceMappingURL=upload.route.js.map

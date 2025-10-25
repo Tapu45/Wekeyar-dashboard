@@ -736,17 +736,23 @@ export const getCustomerPurchaseHistory = async (req: Request, res: Response): P
 
 export const getBillDetailsByBillNo = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { billNo, storeId } = req.params;
+    const { billNo, storeId, year } = req.params;  // Add year to params
 
-    // Validate billNo and storeId
-    if (!billNo || !storeId) {
-      res.status(400).json({ error: "Bill number and store ID are required" });
+    // Validate billNo, storeId, and year
+    if (!billNo || !storeId || !year) {
+      res.status(400).json({ error: "Bill number, store ID, and year are required" });
       return;
     }
 
-    // Fetch the bill details using the composite unique key
+    // Fetch the bill details using the NEW composite unique key with year
     const bill = await prisma.bill.findUnique({
-      where: { billNo_storeId: { billNo, storeId: Number(storeId) } },
+      where: {
+        billNo_storeId_year: {  // Updated to include year
+          billNo,
+          storeId: Number(storeId),
+          year: Number(year)  // Add year
+        }
+      },
       include: {
         customer: true,
         store: true,

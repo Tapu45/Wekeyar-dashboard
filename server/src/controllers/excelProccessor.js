@@ -818,7 +818,10 @@ async function processExcelFile() {
 
     // Create a map for quick lookup
     const existingBillsMap = new Map(
-      existingBills.map((bill) => [`${bill.billNo}-${bill.storeId}`, bill])
+      existingBills.map((bill) => {
+        const billYear = bill.date ? new Date(bill.date).getFullYear() : null;
+        return [`${bill.billNo}-${bill.storeId}-${billYear}`, bill];
+      })
     );
 
     // Separate bills into new and existing
@@ -826,11 +829,11 @@ async function processExcelFile() {
     const billsToUpdate = [];
 
     for (const bill of validBillRecords) {
-      const compositeKey = `${bill.billNo}-${storeId}`;
+      const billYear = new Date(bill.date).getFullYear();  // ADD THIS LINE
+      const compositeKey = `${bill.billNo}-${storeId}-${billYear}`;  // UPDATE KEY
       const existingBill = existingBillsMap.get(compositeKey);
 
       if (!existingBill) {
-        // Bill doesn't exist, add to create list
         billsToCreate.push(bill);
       } else {
         // Bill exists, check if it needs updating
@@ -911,6 +914,7 @@ async function processExcelFile() {
       for (const bill of billBatch) {
         try {
           const customerId = customerMap.get(bill.customerPhone);
+          const billYear = new Date(bill.date).getFullYear();  // ADD THIS LINE
 
           if (!customerId) {
             console.warn(
@@ -924,6 +928,7 @@ async function processExcelFile() {
               const newBill = await tx.bill.create({
                 data: {
                   billNo: bill.billNo,
+                  year: billYear,  // ADD THIS LINE
                   customerId: customerId,
                   storeId: storeId,
                   date: bill.date,

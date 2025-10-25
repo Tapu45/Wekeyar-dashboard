@@ -552,12 +552,15 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           };
         });
 
+        const billYear = new Date(billData.date).getFullYear(); 
+
         // Check if bill already exists
         const existingBill = await prisma.bill.findUnique({
           where: {
-            billNo_storeId: {
+            billNo_storeId_year: {  // UPDATE THIS
               billNo: billData.billNo,
-              storeId: store.id
+              storeId: store.id,
+              year: billYear  // ADD THIS
             }
           }
         });
@@ -572,11 +575,12 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
         const newBill = await prisma.bill.create({
           data: {
             billNo: billData.billNo,
+            year: billYear,  // ADD THIS LINE
             customerId: customer.id,
             storeId: store.id,
             date: billData.date,
             netDiscount: billData.netDiscount || 0,
-            netAmount: 0, // Not using this field as per requirement
+            netAmount: 0,
             amountPaid: billData.isReturnBill ?
               -(billData.amountPaid || billData.calculatedAmount || 0) :
               (billData.amountPaid || billData.calculatedAmount || 0),

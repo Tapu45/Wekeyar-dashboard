@@ -293,7 +293,6 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           }
         }
 
-        // IMPROVED ITEM EXTRACTION LOGIC with support for all three formats
         const medicineItems: any[] = [];
 
         // Find where the actual medicine items start - typically after GST information
@@ -389,7 +388,6 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
             while (lineIndex < cleanedLines.length && lineIndex < i + 10) {
               const nextLine = cleanedLines[lineIndex];
 
-              // Stop if we find the next item pattern or bill summary
               if (/^\d+:\d+/.test(nextLine) || // New format patterns (any X:Y format)
                 /^[1-9]\d{0,2}$/.test(nextLine) || // Old format pattern (just a number)
                 nextLine.startsWith("Rs.")) { // End of items section
@@ -552,7 +550,13 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
           };
         });
 
-        const billYear = new Date(billData.date).getFullYear(); 
+        const billDate = new Date(billData.date);
+        const billMonth = billDate.getMonth(); // 0-11 (0 = January, 3 = April)
+        const billCalendarYear = billDate.getFullYear();
+
+        // If month is January to March (0-2), financial year is previous year
+        // If month is April to December (3-11), financial year is current year
+        const billYear = billMonth < 3 ? billCalendarYear - 1 : billCalendarYear;
 
         // Check if bill already exists
         const existingBill = await prisma.bill.findUnique({
@@ -575,7 +579,7 @@ export async function postDailyBills(req: Request, res: Response): Promise<Respo
         const newBill = await prisma.bill.create({
           data: {
             billNo: billData.billNo,
-            year: billYear,  // ADD THIS LINE
+            year: billYear, 
             customerId: customer.id,
             storeId: store.id,
             date: billData.date,

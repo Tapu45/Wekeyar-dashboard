@@ -313,6 +313,7 @@ async function processExcelFile() {
             .replace(/LN\s+\d+/i, '')        // Remove "LN 99" pattern
             .replace(/DR\s+[A-Z\s]+/i, '')   // Remove "DR S JAMUDA" pattern
             .replace(/[A-Z]+\s+\d+/i, '')    // Remove other code patterns
+            .replace(/\s+\d{1,3}$/i, '')     // Remove trailing 1-3 digit numbers like " 99"
             .trim();
 
           // Clone rowArray and replace this cell with empty string (no items on bill number row)

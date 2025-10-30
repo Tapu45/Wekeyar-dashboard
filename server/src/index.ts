@@ -35,8 +35,8 @@ app.use(cookieParser()); // To parse cookies
 
 
 app.use(cors({ origin: "*" }));
-app.use(express.json({limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 setupSocketIO(io);
 

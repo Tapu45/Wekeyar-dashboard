@@ -312,6 +312,7 @@ async function processExcelFile() {
             .replace(billNo, '')
             .replace(/LN\s+\d+/i, '')        // Remove "LN 99" pattern
             .replace(/DR\s+[A-Z\s]+/i, '')   // Remove "DR S JAMUDA" pattern
+            .replace(/\d{10,}/g, '')         // Remove long numeric IDs (10+ digits) like doctor registration numbers
             .replace(/[A-Z]+\s+\d+/i, '')    // Remove other code patterns
             .replace(/\s+\d{1,3}$/i, '')     // Remove trailing 1-3 digit numbers like " 99"
             .trim();

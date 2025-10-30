@@ -452,7 +452,7 @@ async function processExcelFile() {
           if (!value || isNaN(parseFloat(value))) continue;
 
           const amount = parseFloat(value);
-           const strValue = String(value).trim();
+          const strValue = String(value).trim();
 
           // Skip phone numbers (10 digits)
           if (strValue.length === 10 && /^\d{10}$/.test(strValue)) {
@@ -463,6 +463,16 @@ async function processExcelFile() {
           if (/^\d{10,}$/.test(strValue)) {
             continue;
           }
+
+          // Skip if this number is followed by doctor/person name pattern
+          // Check the original cell value to see if it contains "DR." or person names
+          const cellValue = String(rowArray[i]).toUpperCase();
+          if (cellValue.includes('DR.') || cellValue.includes('DR ') ||
+            /\d+\s+[A-Z]{2,}\s+[A-Z]/.test(cellValue)) {
+            continue;
+          }
+
+         
 
           if (amount < 0) {
             credit += Math.abs(amount);
@@ -478,10 +488,18 @@ async function processExcelFile() {
         const amountMatch = billCell.match(/\s+([\d.\-]+)/);
         if (amountMatch) {
           const amount = parseFloat(amountMatch[1]);
-          if (amount < 0) {
-            credit += Math.abs(amount);
-          } else if (amount > 0) {
-            cash += amount;
+
+          // Skip if followed by doctor/person name
+          if (billCell.toUpperCase().includes('DR.') ||
+            billCell.toUpperCase().includes('DR ') ||
+            /\d+\s+[A-Z]{2,}\s+[A-Z]/.test(billCell)) {
+            // Don't process this amount
+          } else if (Math.abs(amount) <= 1000000) {
+            if (amount < 0) {
+              credit += Math.abs(amount);
+            } else if (amount > 0) {
+              cash += amount;
+            }
           }
         }
       }
@@ -504,6 +522,16 @@ async function processExcelFile() {
             if (/^\d{10,}$/.test(strValue)) {
               continue;
             }
+
+            // Skip if followed by doctor/person name
+            const cellValue = String(rowArray[i]).toUpperCase();
+            if (cellValue.includes('DR.') || cellValue.includes('DR ') ||
+              /\d+\s+[A-Z]{2,}\s+[A-Z]/.test(cellValue)) {
+              continue;
+            }
+
+          
+
             if (amount < 0) {
               credit += Math.abs(amount);
             } else if (amount > 0) {

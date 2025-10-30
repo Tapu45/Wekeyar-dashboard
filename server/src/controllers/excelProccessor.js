@@ -459,6 +459,11 @@ async function processExcelFile() {
             continue;
           }
 
+          // Skip doctor registration numbers and other long numeric IDs (10+ digits)
+          if (/^\d{10,}$/.test(strValue)) {
+            continue;
+          }
+
           if (amount < 0) {
             credit += Math.abs(amount);
           } else if (amount > 0) {
@@ -493,6 +498,12 @@ async function processExcelFile() {
             if (!value || isNaN(parseFloat(value))) continue;
 
             const amount = parseFloat(value);
+            const strValue = String(value).trim();
+
+            // Skip long numeric IDs
+            if (/^\d{10,}$/.test(strValue)) {
+              continue;
+            }
             if (amount < 0) {
               credit += Math.abs(amount);
             } else if (amount > 0) {

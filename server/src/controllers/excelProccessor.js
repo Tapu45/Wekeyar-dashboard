@@ -446,50 +446,39 @@ async function processExcelFile() {
       );
 
       if (billIndex >= 0) {
-        // Only add positive numbers to cash, negative to credit
+        // Find the first numeric cell after the bill number (ignore description columns)
         for (let i = billIndex + 1; i < rowArray.length; i++) {
           const value = rowArray[i];
-          if (!value || isNaN(parseFloat(value))) continue;
-
-          const amount = parseFloat(value);
+          if (!value) continue;
           const strValue = String(value).trim();
 
-          // Skip phone numbers (10 digits)
-          if (strValue.length === 10 && /^\d{10}$/.test(strValue)) {
-            continue;
-          }
+          // Only consider if the cell is just a number (no other text)
+          if (!/^-?\d+(\.\d+)?$/.test(strValue)) continue;
 
-          // Skip doctor registration numbers and other long numeric IDs (10+ digits)
-          if (/^\d{10,}$/.test(strValue)) {
-            continue;
-          }
+          // Skip phone numbers (10 digits) and long IDs
+          if (/^\d{10,}$/.test(strValue)) continue;
 
-          // Skip if this number is followed by doctor/person name pattern
-          // Check the original cell value to see if it contains "DR." or person names
-          const cellValue = String(rowArray[i]).toUpperCase();
+          // Skip if cell contains doctor/person name pattern
+          const cellValue = strValue.toUpperCase();
           if (cellValue.includes('DR.') || cellValue.includes('DR ') ||
-            /\d+\s+[A-Z]{2,}\s+[A-Z]/.test(cellValue)) {
-            continue;
-          }
+            /\d+\s+[A-Z]{2,}\s+[A-Z]/.test(cellValue)) continue;
 
-         
-
+          const amount = parseFloat(strValue);
           if (amount < 0) {
             credit += Math.abs(amount);
           } else if (amount > 0) {
             cash += amount;
           }
+          break; // Only take the first numeric cell after bill number
         }
       }
 
-      // Second pass: If no amounts found yet, check the bill number cell itself
+      // Second pass: If no amounts found yet, check the bill number cell itself (unchanged)
       if (cash === 0 && billIndex >= 0) {
         const billCell = String(rowArray[billIndex]);
         const amountMatch = billCell.match(/\s+([\d.\-]+)/);
         if (amountMatch) {
           const amount = parseFloat(amountMatch[1]);
-
-          // Skip if followed by doctor/person name
           if (billCell.toUpperCase().includes('DR.') ||
             billCell.toUpperCase().includes('DR ') ||
             /\d+\s+[A-Z]{2,}\s+[A-Z]/.test(billCell)) {
@@ -504,7 +493,7 @@ async function processExcelFile() {
         }
       }
 
-      // Third pass: Look for amounts in a nearby "TOTAL AMOUNT" row
+      // Third pass: Look for amounts in a nearby "TOTAL AMOUNT" row (unchanged)
       if (cash === 0) {
         const totalAmountIdx = rowArray.findIndex(cell =>
           cell && String(cell).includes('TOTAL AMOUNT')
@@ -529,8 +518,6 @@ async function processExcelFile() {
               /\d+\s+[A-Z]{2,}\s+[A-Z]/.test(cellValue)) {
               continue;
             }
-
-          
 
             if (amount < 0) {
               credit += Math.abs(amount);

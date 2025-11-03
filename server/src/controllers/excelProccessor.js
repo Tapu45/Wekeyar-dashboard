@@ -22,7 +22,7 @@ const prisma = new PrismaClient({
 const BATCH_SIZE = 50;
 
 const BILL_PREFIXES = ["CSP", "DUM", "GGP", "IRC", "KV", "MM", "RUCH", "SAM", "SUM", "VSS", "CS", "CN"];
-const BILL_REGEX = new RegExp(`^(${BILL_PREFIXES.join("|")})(\\/)?\\d+`, "i");
+const BILL_REGEX = new RegExp(`^(${BILL_PREFIXES.join("|")}|[A-Z])(\\/)?\\d+`, "i");
 
 const KNOWN_STORES = [
   "RUCHIKA",

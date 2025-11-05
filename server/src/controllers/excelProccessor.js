@@ -446,7 +446,7 @@ async function processExcelFile() {
       );
 
       if (billIndex >= 0) {
-        // Find the first numeric cell after the bill number (ignore description columns)
+        // Find the first numeric cell after the bill number
         for (let i = billIndex + 1; i < rowArray.length; i++) {
           const value = rowArray[i];
           if (!value) continue;
@@ -463,17 +463,23 @@ async function processExcelFile() {
           if (cellValue.includes('DR.') || cellValue.includes('DR ') ||
             /\d+\s+[A-Z]{2,}\s+[A-Z]/.test(cellValue)) continue;
 
+          // *** KEY CHANGE: SKIP INTEGERS (no decimal point) ***
+          // Only accept numbers with decimals like 1354.00, 559.50
+          if (!/\.\d+$/.test(strValue)) {
+            continue; // Skip if no decimal point
+          }
+
           const amount = parseFloat(strValue);
           if (amount < 0) {
             credit += Math.abs(amount);
           } else if (amount > 0) {
             cash += amount;
           }
-          break; // Only take the first numeric cell after bill number
+          return { cash, credit }; // Return immediately
         }
       }
 
-      // Second pass: If no amounts found yet, check the bill number cell itself (unchanged)
+      // Second pass: If no amounts found yet, check the bill number cell itself
       if (cash === 0 && billIndex >= 0) {
         const billCell = String(rowArray[billIndex]);
         const amountMatch = billCell.match(/\s+([\d.\-]+)/);
@@ -489,11 +495,12 @@ async function processExcelFile() {
             } else if (amount > 0) {
               cash += amount;
             }
+            return { cash, credit };
           }
         }
       }
 
-      // Third pass: Look for amounts in a nearby "TOTAL AMOUNT" row (unchanged)
+      // Third pass: Look for amounts in a nearby "TOTAL AMOUNT" row
       if (cash === 0) {
         const totalAmountIdx = rowArray.findIndex(cell =>
           cell && String(cell).includes('TOTAL AMOUNT')
@@ -504,13 +511,19 @@ async function processExcelFile() {
             const value = rowArray[i];
             if (!value || isNaN(parseFloat(value))) continue;
 
-            const amount = parseFloat(value);
             const strValue = String(value).trim();
 
             // Skip long numeric IDs
             if (/^\d{10,}$/.test(strValue)) {
               continue;
             }
+
+            // Skip integers (must have decimal for amount paid)
+            if (!/\.\d+$/.test(strValue)) {
+              continue;
+            }
+
+            const amount = parseFloat(value);
 
             // Skip if followed by doctor/person name
             const cellValue = String(rowArray[i]).toUpperCase();
@@ -524,6 +537,7 @@ async function processExcelFile() {
             } else if (amount > 0) {
               cash += amount;
             }
+            return { cash, credit };
           }
         }
       }

@@ -34,12 +34,10 @@ const FileUpload: React.FC = () => {
   const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]); // State to store logs
 
-
   // Fetch upload history on component mount
   useEffect(() => {
     fetchUploadHistory();
   }, []);
-
 
   const fetchUploadHistory = async () => {
     setIsLoading(true);
@@ -61,17 +59,17 @@ const FileUpload: React.FC = () => {
     const eventSource = new EventSource(
       API_ROUTES.UPLOAD_LOGS.replace(":id", uploadId)
     );
-  
+
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
       setLogs((prevLogs) => [...prevLogs, data.log]); // Append new logs
     };
-  
+
     eventSource.onerror = () => {
       console.error("Error connecting to log stream");
       eventSource.close();
     };
-  
+
     return () => {
       eventSource.close();
     };
@@ -102,7 +100,7 @@ const FileUpload: React.FC = () => {
     setUploadResult(null);
   };
 
-  
+  // Update the handleUpload function
 
   const handleUpload = async () => {
     if (!file) {
@@ -110,12 +108,11 @@ const FileUpload: React.FC = () => {
       return;
     }
 
-     // Validate file extension
-  const fileExtension = file.name.split(".").pop()?.toLowerCase();
-  if (fileExtension !== "xlsx") {
-    setError("Invalid file format. Only .xlsx files are supported.");
-    return;
-  }
+    const fileExtension = file.name.split(".").pop()?.toLowerCase();
+    if (fileExtension !== "xlsx") {
+      setError("Invalid file format. Only .xlsx files are supported.");
+      return;
+    }
 
     const formData = new FormData();
     formData.append("excelFile", file);
@@ -123,23 +120,88 @@ const FileUpload: React.FC = () => {
     setIsUploading(true);
     setError(null);
     setUploadResult(null);
+    setLogs([]); // Clear previous logs
 
     try {
       const response = await api.post(API_ROUTES.UPLOAD, formData, {
-        // Use the `api` instance and `API_ROUTES.UPLOAD`
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
 
-      setUploadResult(response.data);
-      fetchUploadHistory();
+      // File uploaded successfully, now wait for processing
+      const uploadId = response.data.uploadId;
+      console.log("Upload ID:", uploadId);
+
+      // Set up SSE connection to receive logs
+      setupLogStream(uploadId);
+
+      // Poll for completion
+      let isComplete = false;
+      let pollCount = 0;
+      const maxPolls = 3600; // 1 hour with 1 second intervals
+
+      while (!isComplete && pollCount < maxPolls) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        try {
+          const statusResponse = await api.get(
+            API_ROUTES.UPLOAD_STATUS.replace(":id", uploadId.toString())
+          );
+
+          if (statusResponse.data.status === "completed") {
+            setUploadResult({
+              success: true,
+              stats: {
+                billsCreated: statusResponse.data.recordsProcessed,
+                itemsCreated: statusResponse.data.itemsCreated,
+              },
+            });
+            isComplete = true;
+            fetchUploadHistory();
+          } else if (statusResponse.data.status === "failed") {
+            setError("Upload processing failed");
+            isComplete = true;
+          }
+        } catch (err) {
+          console.error("Error checking upload status:", err);
+        }
+
+        pollCount++;
+      }
+
+      if (!isComplete) {
+        setError("Upload processing timeout");
+      }
     } catch (err: any) {
       console.error("Upload error:", err);
       setError(err.response?.data?.error || "An error occurred during upload");
     } finally {
-      setTimeout(() => setIsUploading(false), 1000); // Add slight delay for animation
+      setIsUploading(false);
     }
+  };
+
+  const setupLogStream = (uploadId: number) => {
+    const eventSource = new EventSource(
+      API_ROUTES.UPLOAD_LOGS.replace(":id", uploadId.toString())
+    );
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        setLogs((prevLogs) => [...prevLogs, data.log]);
+      } catch (error) {
+        console.error("Error parsing log:", error);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error("Error in log stream:", error);
+      eventSource.close();
+    };
+
+    // Keep reference to close it later if needed
+    return eventSource;
   };
 
   const formatFileSize = (bytes: number) => {
@@ -179,7 +241,7 @@ const FileUpload: React.FC = () => {
       <div className="relative h-96 w-full overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 shadow-xl mb-6">
         {/* Deep space background effect */}
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSA2MCAwIEwgMCAwIDAgNjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSg5OSwgMTAyLCAyNDEsIDAuMSkiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-15" />
-        
+
         {/* Stars/data particles in background */}
         {[...Array(40)].map((_, i) => (
           <motion.div
@@ -188,7 +250,16 @@ const FileUpload: React.FC = () => {
             style={{
               width: Math.random() > 0.7 ? 2 : 1,
               height: Math.random() > 0.7 ? 2 : 1,
-              backgroundColor: i % 5 === 0 ? "#a5b4fc" : i % 5 === 1 ? "#93c5fd" : i % 5 === 2 ? "#6366f1" : i % 5 === 3 ? "#38bdf8" : "#f0f9ff",
+              backgroundColor:
+                i % 5 === 0
+                  ? "#a5b4fc"
+                  : i % 5 === 1
+                  ? "#93c5fd"
+                  : i % 5 === 2
+                  ? "#6366f1"
+                  : i % 5 === 3
+                  ? "#38bdf8"
+                  : "#f0f9ff",
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
             }}
@@ -203,7 +274,7 @@ const FileUpload: React.FC = () => {
             }}
           />
         ))}
-        
+
         {/* Core Neural Network Node */}
         <motion.div
           className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center z-10"
@@ -239,14 +310,14 @@ const FileUpload: React.FC = () => {
                 <Cpu size={20} className="text-blue-50" strokeWidth={1.5} />
               </motion.div>
             </motion.div>
-            
+
             {/* Orbital nodes */}
             {[...Array(8)].map((_, i) => {
               const angle = (i / 8) * Math.PI * 2;
               const radius = 90;
               const x = Math.cos(angle) * radius;
               const y = Math.sin(angle) * radius;
-              
+
               return (
                 <React.Fragment key={`node-${i}`}>
                   {/* Connection line */}
@@ -265,7 +336,7 @@ const FileUpload: React.FC = () => {
                       delay: i * 0.2,
                     }}
                   />
-                  
+
                   {/* Data pulse traveling along the connection */}
                   <motion.div
                     className="absolute left-1/2 top-1/2 w-1.5 h-1.5 rounded-full bg-sky-300 shadow-sm shadow-sky-500/50"
@@ -281,7 +352,7 @@ const FileUpload: React.FC = () => {
                       ease: "easeInOut",
                     }}
                   />
-                  
+
                   {/* Orbital node */}
                   <motion.div
                     className="absolute w-6 h-6 rounded-full flex items-center justify-center"
@@ -289,8 +360,10 @@ const FileUpload: React.FC = () => {
                       left: `calc(50% + ${x}px)`,
                       top: `calc(50% + ${y}px)`,
                       transform: "translate(-50%, -50%)",
-                      background: i % 2 === 0 ? "linear-gradient(to bottom right, rgb(56, 189, 248), rgb(99, 102, 241))" : 
-                                              "linear-gradient(to bottom right, rgb(14, 165, 233), rgb(79, 70, 229))",
+                      background:
+                        i % 2 === 0
+                          ? "linear-gradient(to bottom right, rgb(56, 189, 248), rgb(99, 102, 241))"
+                          : "linear-gradient(to bottom right, rgb(14, 165, 233), rgb(79, 70, 229))",
                     }}
                     animate={{
                       scale: [1, 1.2, 1],
@@ -306,17 +379,25 @@ const FileUpload: React.FC = () => {
                       delay: i * 0.1,
                     }}
                   >
-                    {i % 4 === 0 && <Database size={12} className="text-white" />}
-                    {i % 4 === 1 && <FileSpreadsheet size={12} className="text-white" />}
-                    {i % 4 === 2 && <BarChart3 size={12} className="text-white" />}
-                    {i % 4 === 3 && <FileText size={12} className="text-white" />}
+                    {i % 4 === 0 && (
+                      <Database size={12} className="text-white" />
+                    )}
+                    {i % 4 === 1 && (
+                      <FileSpreadsheet size={12} className="text-white" />
+                    )}
+                    {i % 4 === 2 && (
+                      <BarChart3 size={12} className="text-white" />
+                    )}
+                    {i % 4 === 3 && (
+                      <FileText size={12} className="text-white" />
+                    )}
                   </motion.div>
                 </React.Fragment>
               );
             })}
           </div>
         </motion.div>
-        
+
         {/* Data Source Zone - Left */}
         <motion.div
           className="absolute left-4 top-1/2 transform -translate-y-1/2 flex flex-col items-center"
@@ -341,57 +422,68 @@ const FileUpload: React.FC = () => {
             <div className="p-2 border-b border-emerald-700/30 bg-emerald-800/20 flex justify-between items-center">
               <div className="flex items-center gap-1.5">
                 <FileSpreadsheet size={14} className="text-emerald-400" />
-                <span className="text-xs font-medium text-emerald-300">Source Data</span>
+                <span className="text-xs font-medium text-emerald-300">
+                  Source Data
+                </span>
               </div>
               <div className="flex gap-1">
-                <motion.div 
+                <motion.div
                   className="w-2 h-2 rounded-full bg-emerald-400"
                   animate={{ opacity: [0.6, 1, 0.6] }}
                   transition={{ repeat: Infinity, duration: 1.5 }}
                 />
               </div>
             </div>
-            
+
             {/* Data Grid */}
             <div className="flex-1 p-2 relative">
               {/* Table header */}
               <div className="grid grid-cols-3 gap-1 mb-1">
                 {["ID", "Name", "Value"].map((header, i) => (
-                  <div 
+                  <div
                     key={`header-${i}`}
                     className="h-4 rounded-sm bg-emerald-800/40 px-1.5 flex items-center"
                   >
-                    <span className="text-[0.6rem] text-emerald-300 font-medium">{header}</span>
+                    <span className="text-[0.6rem] text-emerald-300 font-medium">
+                      {header}
+                    </span>
                   </div>
                 ))}
               </div>
-              
+
               {/* Table rows */}
               <div className="grid grid-cols-1 gap-1">
                 {[...Array(6)].map((_, rowIndex) => (
-                  <motion.div 
+                  <motion.div
                     key={`row-${rowIndex}`}
                     className="grid grid-cols-3 gap-1"
                     animate={{
-                      backgroundColor: rowIndex === 2 ? ["rgba(16, 185, 129, 0.1)", "rgba(16, 185, 129, 0.25)", "rgba(16, 185, 129, 0.1)"] : "transparent",
+                      backgroundColor:
+                        rowIndex === 2
+                          ? [
+                              "rgba(16, 185, 129, 0.1)",
+                              "rgba(16, 185, 129, 0.25)",
+                              "rgba(16, 185, 129, 0.1)",
+                            ]
+                          : "transparent",
                     }}
                     transition={{ repeat: Infinity, duration: 2 }}
                   >
                     {[...Array(3)].map((_, cellIndex) => (
-                      <div 
+                      <div
                         key={`cell-${rowIndex}-${cellIndex}`}
                         className="h-3 rounded-sm bg-emerald-800/20 overflow-hidden"
                       >
-                        <motion.div 
+                        <motion.div
                           className="h-full w-full bg-emerald-700/20"
-                          style={{ width: (Math.random() * 70 + 30) + "%" }}
+                          style={{ width: Math.random() * 70 + 30 + "%" }}
                         />
                       </div>
                     ))}
                   </motion.div>
                 ))}
               </div>
-              
+
               {/* Selection overlay */}
               <motion.div
                 className="absolute inset-x-2 h-3 rounded-sm bg-emerald-500/25 border border-emerald-400/30"
@@ -405,15 +497,19 @@ const FileUpload: React.FC = () => {
                 }}
                 transition={{ repeat: Infinity, duration: 2 }}
               />
-              
+
               {/* Scan line */}
               <motion.div
                 className="absolute inset-x-2 h-0.5 bg-emerald-400/70"
                 animate={{ top: ["15%", "90%", "15%"] }}
-                transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 3,
+                  ease: "easeInOut",
+                }}
               />
             </div>
-            
+
             {/* Status indicators */}
             <div className="h-6 px-2 bg-emerald-800/20 border-t border-emerald-700/30 flex items-center justify-between">
               <div className="flex items-center gap-1">
@@ -425,10 +521,12 @@ const FileUpload: React.FC = () => {
                 </motion.div>
                 <span className="text-[0.6rem] text-emerald-300">Scanning</span>
               </div>
-              <div className="text-[0.6rem] text-emerald-400 font-medium">6 records</div>
+              <div className="text-[0.6rem] text-emerald-400 font-medium">
+                6 records
+              </div>
             </div>
           </motion.div>
-          
+
           {/* Emission points */}
           <motion.div
             className="absolute right-0 top-1/3 transform translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full"
@@ -441,7 +539,7 @@ const FileUpload: React.FC = () => {
             }}
             transition={{ repeat: Infinity, duration: 2 }}
           />
-          
+
           <motion.div
             className="absolute right-0 top-2/3 transform translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full"
             animate={{
@@ -454,7 +552,7 @@ const FileUpload: React.FC = () => {
             transition={{ repeat: Infinity, duration: 2, delay: 1 }}
           />
         </motion.div>
-        
+
         {/* Target Database - Right */}
         <motion.div
           className="absolute right-4 top-1/2 transform -translate-y-1/2 flex flex-col items-center"
@@ -479,22 +577,24 @@ const FileUpload: React.FC = () => {
             <div className="p-2 border-b border-indigo-700/30 bg-indigo-800/20 flex justify-between items-center">
               <div className="flex items-center gap-1.5">
                 <Database size={14} className="text-indigo-400" />
-                <span className="text-xs font-medium text-indigo-300">Target DB</span>
+                <span className="text-xs font-medium text-indigo-300">
+                  Target DB
+                </span>
               </div>
               <div className="flex gap-1">
-                <motion.div 
+                <motion.div
                   className="w-2 h-2 rounded-full bg-indigo-400"
                   animate={{ opacity: [0.6, 1, 0.6] }}
                   transition={{ repeat: Infinity, duration: 1.5 }}
                 />
-                <motion.div 
+                <motion.div
                   className="w-2 h-2 rounded-full bg-indigo-500"
                   animate={{ opacity: [0.6, 1, 0.6] }}
                   transition={{ repeat: Infinity, duration: 1.5, delay: 0.5 }}
                 />
               </div>
             </div>
-            
+
             {/* Database Visualization */}
             <div className="flex-1 p-2 relative">
               {/* Database tables */}
@@ -502,14 +602,16 @@ const FileUpload: React.FC = () => {
                 {[...Array(3)].map((_, tableIndex) => (
                   <div key={`table-${tableIndex}`} className="space-y-0.5">
                     <div className="h-4 rounded-t-sm bg-indigo-800/40 px-1.5 flex items-center justify-between">
-                      <span className="text-[0.6rem] text-indigo-300 font-medium">Table_{tableIndex + 1}</span>
+                      <span className="text-[0.6rem] text-indigo-300 font-medium">
+                        Table_{tableIndex + 1}
+                      </span>
                       <div className="w-1.5 h-1.5 rounded-full bg-indigo-400/70" />
                     </div>
                     <div className="h-1.5 bg-indigo-800/20 rounded-b-sm" />
                   </div>
                 ))}
               </div>
-              
+
               {/* Active area */}
               <motion.div
                 className="absolute bottom-2 inset-x-2 h-10 rounded-sm bg-indigo-500/10 border border-indigo-500/30 p-1"
@@ -526,33 +628,58 @@ const FileUpload: React.FC = () => {
                 <div className="h-full overflow-hidden">
                   <div className="grid grid-cols-3 gap-0.5">
                     {[...Array(3)].map((_, i) => (
-                      <div key={`header-active-${i}`} className="h-1.5 bg-indigo-700/40 rounded-sm" />
+                      <div
+                        key={`header-active-${i}`}
+                        className="h-1.5 bg-indigo-700/40 rounded-sm"
+                      />
                     ))}
                   </div>
-                  
+
                   <div className="mt-0.5 space-y-0.5">
                     {[...Array(3)].map((_, rowIndex) => (
-                      <motion.div 
+                      <motion.div
                         key={`active-row-${rowIndex}`}
-                        className={`grid grid-cols-3 gap-0.5 ${rowIndex === 0 ? "opacity-100" : rowIndex === 1 ? "opacity-70" : "opacity-40"}`}
-                        animate={rowIndex === 0 ? {
-                          backgroundColor: ["rgba(99, 102, 241, 0)", "rgba(99, 102, 241, 0.2)", "rgba(99, 102, 241, 0)"],
-                        } : {}}
+                        className={`grid grid-cols-3 gap-0.5 ${
+                          rowIndex === 0
+                            ? "opacity-100"
+                            : rowIndex === 1
+                            ? "opacity-70"
+                            : "opacity-40"
+                        }`}
+                        animate={
+                          rowIndex === 0
+                            ? {
+                                backgroundColor: [
+                                  "rgba(99, 102, 241, 0)",
+                                  "rgba(99, 102, 241, 0.2)",
+                                  "rgba(99, 102, 241, 0)",
+                                ],
+                              }
+                            : {}
+                        }
                         transition={{ repeat: Infinity, duration: 2 }}
                       >
                         {[...Array(3)].map((_, cellIndex) => (
-                          <motion.div 
+                          <motion.div
                             key={`active-cell-${rowIndex}-${cellIndex}`}
                             className="h-1.5 bg-indigo-700/30 rounded-sm overflow-hidden"
-                            animate={rowIndex === 0 ? {
-                              width: ["70%", "100%", "100%"],
-                            } : {}}
-                            transition={rowIndex === 0 ? {
-                              repeat: Infinity, 
-                              repeatDelay: 3,
-                              duration: 0.5,
-                              delay: cellIndex * 0.2,
-                            } : {}}
+                            animate={
+                              rowIndex === 0
+                                ? {
+                                    width: ["70%", "100%", "100%"],
+                                  }
+                                : {}
+                            }
+                            transition={
+                              rowIndex === 0
+                                ? {
+                                    repeat: Infinity,
+                                    repeatDelay: 3,
+                                    duration: 0.5,
+                                    delay: cellIndex * 0.2,
+                                  }
+                                : {}
+                            }
                           />
                         ))}
                       </motion.div>
@@ -560,7 +687,7 @@ const FileUpload: React.FC = () => {
                   </div>
                 </div>
               </motion.div>
-              
+
               {/* Processing indicators */}
               <motion.div
                 className="absolute right-1 top-1 w-4 h-4 rounded-full bg-indigo-500/20 flex items-center justify-center"
@@ -578,22 +705,20 @@ const FileUpload: React.FC = () => {
                 </motion.div>
               </motion.div>
             </div>
-            
+
             {/* Status indicators */}
             <div className="h-6 px-2 bg-indigo-800/20 border-t border-indigo-700/30 flex items-center justify-between">
               <div className="flex items-center gap-1">
-                <motion.div
-                  className="relative w-2 h-2"
-                >
-                  <motion.div 
+                <motion.div className="relative w-2 h-2">
+                  <motion.div
                     className="absolute inset-0 rounded-full bg-indigo-400"
                     animate={{ scale: [1, 1.5, 1], opacity: [1, 0, 1] }}
-                    transition={{ repeat: Infinity, duration: 2 }} 
+                    transition={{ repeat: Infinity, duration: 2 }}
                   />
                 </motion.div>
                 <span className="text-[0.6rem] text-indigo-300">Receiving</span>
               </div>
-              <motion.div 
+              <motion.div
                 className="text-[0.6rem] text-indigo-400 font-medium"
                 animate={{ opacity: [0.7, 1, 0.7] }}
                 transition={{ repeat: Infinity, duration: 2 }}
@@ -602,7 +727,7 @@ const FileUpload: React.FC = () => {
               </motion.div>
             </div>
           </motion.div>
-          
+
           {/* Receiving points */}
           <motion.div
             className="absolute left-0 top-1/3 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full"
@@ -615,7 +740,7 @@ const FileUpload: React.FC = () => {
             }}
             transition={{ repeat: Infinity, duration: 2 }}
           />
-          
+
           <motion.div
             className="absolute left-0 top-2/3 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full"
             animate={{
@@ -628,7 +753,7 @@ const FileUpload: React.FC = () => {
             transition={{ repeat: Infinity, duration: 2, delay: 1 }}
           />
         </motion.div>
-        
+
         {/* Data streams - Multiple pathways */}
         {/* Stream 1 - Direct path */}
         {[...Array(8)].map((_, i) => {
@@ -640,7 +765,9 @@ const FileUpload: React.FC = () => {
               style={{
                 width: isAlternate ? 3 : 2,
                 height: isAlternate ? 3 : 2,
-                backgroundColor: isAlternate ? "rgba(56, 189, 248, 0.9)" : "rgba(165, 180, 252, 0.9)",
+                backgroundColor: isAlternate
+                  ? "rgba(56, 189, 248, 0.9)"
+                  : "rgba(165, 180, 252, 0.9)",
               }}
               initial={{
                 x: "28%",
@@ -661,7 +788,7 @@ const FileUpload: React.FC = () => {
             />
           );
         })}
-        
+
         {/* Stream 2 - Through neural network */}
         {[...Array(8)].map((_, i) => {
           const isAlternate = i % 2 === 0;
@@ -672,7 +799,9 @@ const FileUpload: React.FC = () => {
               style={{
                 width: isAlternate ? 3 : 2,
                 height: isAlternate ? 3 : 2,
-                backgroundColor: isAlternate ? "rgba(16, 185, 129, 0.9)" : "rgba(14, 165, 233, 0.9)",
+                backgroundColor: isAlternate
+                  ? "rgba(16, 185, 129, 0.9)"
+                  : "rgba(14, 165, 233, 0.9)",
               }}
               initial={{
                 x: "28%",
@@ -694,9 +823,7 @@ const FileUpload: React.FC = () => {
             />
           );
         })}
-        
-       
-        
+
         {/* Analytics overlay elements */}
         <motion.div
           className="absolute left-0 top-0 mt-4 ml-4 flex items-center gap-2"
@@ -706,8 +833,14 @@ const FileUpload: React.FC = () => {
         >
           <motion.div
             className="px-2 py-1 rounded-md bg-slate-800/60 backdrop-blur-sm border border-slate-700/30 flex items-center gap-2"
-            animate={{ backgroundColor: ["rgba(15, 23, 42, 0.6)", "rgba(15, 23, 42, 0.7)", "rgba(15, 23, 42, 0.6)"] }}
-          transition={{ repeat: Infinity, duration: 3 }}
+            animate={{
+              backgroundColor: [
+                "rgba(15, 23, 42, 0.6)",
+                "rgba(15, 23, 42, 0.7)",
+                "rgba(15, 23, 42, 0.6)",
+              ],
+            }}
+            transition={{ repeat: Infinity, duration: 3 }}
           >
             <motion.div
               animate={{ rotate: 360 }}
@@ -715,12 +848,20 @@ const FileUpload: React.FC = () => {
             >
               <ActivitySquare size={14} className="text-blue-400" />
             </motion.div>
-            <span className="text-xs text-blue-300 font-medium">Data Flow: Active</span>
+            <span className="text-xs text-blue-300 font-medium">
+              Data Flow: Active
+            </span>
           </motion.div>
-          
+
           <motion.div
             className="px-2 py-1 rounded-md bg-slate-800/60 backdrop-blur-sm border border-slate-700/30 flex items-center gap-2"
-            animate={{ backgroundColor: ["rgba(15, 23, 42, 0.6)", "rgba(15, 23, 42, 0.7)", "rgba(15, 23, 42, 0.6)"] }}
+            animate={{
+              backgroundColor: [
+                "rgba(15, 23, 42, 0.6)",
+                "rgba(15, 23, 42, 0.7)",
+                "rgba(15, 23, 42, 0.6)",
+              ],
+            }}
             transition={{ repeat: Infinity, duration: 3, delay: 0.5 }}
           >
             <motion.div
@@ -729,10 +870,12 @@ const FileUpload: React.FC = () => {
             >
               <Zap size={14} className="text-amber-400" />
             </motion.div>
-            <span className="text-xs text-amber-300 font-medium">Performance: Optimal</span>
+            <span className="text-xs text-amber-300 font-medium">
+              Performance: Optimal
+            </span>
           </motion.div>
         </motion.div>
-        
+
         {/* Analytics overlay - right side */}
         <motion.div
           className="absolute right-0 top-0 mt-4 mr-4 flex items-center gap-2"
@@ -742,7 +885,13 @@ const FileUpload: React.FC = () => {
         >
           <motion.div
             className="px-2 py-1 rounded-md bg-slate-800/60 backdrop-blur-sm border border-slate-700/30 flex items-center gap-2"
-            animate={{ backgroundColor: ["rgba(15, 23, 42, 0.6)", "rgba(15, 23, 42, 0.7)", "rgba(15, 23, 42, 0.6)"] }}
+            animate={{
+              backgroundColor: [
+                "rgba(15, 23, 42, 0.6)",
+                "rgba(15, 23, 42, 0.7)",
+                "rgba(15, 23, 42, 0.6)",
+              ],
+            }}
             transition={{ repeat: Infinity, duration: 3, delay: 0.2 }}
           >
             <motion.div
@@ -751,12 +900,20 @@ const FileUpload: React.FC = () => {
             >
               <ShieldCheck size={14} className="text-emerald-400" />
             </motion.div>
-            <span className="text-xs text-emerald-300 font-medium">Security: Encrypted</span>
+            <span className="text-xs text-emerald-300 font-medium">
+              Security: Encrypted
+            </span>
           </motion.div>
-          
+
           <motion.div
             className="px-2 py-1 rounded-md bg-slate-800/60 backdrop-blur-sm border border-slate-700/30 flex items-center gap-2"
-            animate={{ backgroundColor: ["rgba(15, 23, 42, 0.6)", "rgba(15, 23, 42, 0.7)", "rgba(15, 23, 42, 0.6)"] }}
+            animate={{
+              backgroundColor: [
+                "rgba(15, 23, 42, 0.6)",
+                "rgba(15, 23, 42, 0.7)",
+                "rgba(15, 23, 42, 0.6)",
+              ],
+            }}
             transition={{ repeat: Infinity, duration: 3, delay: 0.7 }}
           >
             <motion.div
@@ -766,14 +923,14 @@ const FileUpload: React.FC = () => {
             >
               <Clock size={14} className="text-purple-400" />
             </motion.div>
-            <span className="text-xs text-purple-300 font-medium">Time: Optimized</span>
+            <span className="text-xs text-purple-300 font-medium">
+              Time: Optimized
+            </span>
           </motion.div>
         </motion.div>
       </div>
     );
   };
-  
-  
 
   const toggleFileDetails = (id: string | number) => {
     const uploadId = id.toString(); // Ensure the ID is a string

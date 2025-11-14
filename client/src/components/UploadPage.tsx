@@ -100,8 +100,6 @@ const FileUpload: React.FC = () => {
     setUploadResult(null);
   };
 
-  // Update the handleUpload function
-
   const handleUpload = async () => {
     if (!file) {
       setError("Please select a file first");

@@ -482,7 +482,7 @@ async function processExcelFile() {
       // Second pass: If no amounts found yet, check the bill number cell itself
       if (cash === 0 && billIndex >= 0) {
         const billCell = String(rowArray[billIndex]);
-        const amountMatch = billCell.match(/\s+([\d.\-]+)/);
+        const amountMatch = billCell.match(/\s+([\d]+\.\d+)/);
         if (amountMatch) {
           const amount = parseFloat(amountMatch[1]);
           if (billCell.toUpperCase().includes('DR.') ||

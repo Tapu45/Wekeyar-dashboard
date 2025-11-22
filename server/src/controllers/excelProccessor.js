@@ -446,7 +446,7 @@ async function processExcelFile() {
       );
 
       if (billIndex >= 0) {
-        // Start searching AFTER the bill number cell (billIndex + 1)
+        
         // This ignores any integers in the bill number cell like "CSP/31861 99"
         for (let i = billIndex + 1; i < rowArray.length; i++) {
           const value = rowArray[i];
